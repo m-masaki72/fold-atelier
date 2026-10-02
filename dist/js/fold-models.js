@@ -44,7 +44,7 @@ function paperFaces(part) {
   });
 }
 
-export function buildPaperModel(spec, savedNet) {
+export function buildPaperModel(spec, { net, useCache = true } = {}) {
   const entry = COLLECTION.find((item) => item.id === spec.kind);
   const resolvedSpec = entry ? { ...spec, kind: 'study', family: entry.family, seed: entry.seed } : spec;
   const stature = resolvedSpec.stature || 1;
@@ -58,7 +58,7 @@ export function buildPaperModel(spec, savedNet) {
     name: resolvedSpec.kind,
     position: [0, 0, 0],
     surface: exteriorSurface(solids),
-    net: savedNet || NETS[netKey],
+    net: net ?? (useCache ? NETS[netKey] : undefined),
   });
   const sequence = createFoldSequence(part);
   const faces = paperFaces(part);

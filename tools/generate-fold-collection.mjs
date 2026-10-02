@@ -89,7 +89,10 @@ function thumbnail(model) {
 
 for (const preset of MODEL_PRESETS)
   for (const stature of [1, 0.78, 1.3]) {
-    const model = buildPaperModel({ kind: preset.id, stature }, nets[`${preset.id}:${stature}`]);
+    const model = buildPaperModel(
+      { kind: preset.id, stature },
+      { net: nets[`${preset.id}:${stature}`], useCache: false },
+    );
     auditNet(model);
     nets[`${preset.id}:${stature}`] = serialize(model);
   }
@@ -102,7 +105,7 @@ for (let family = 0; family < STUDY_FAMILIES.length; family++) {
     let model;
     try {
       auditSurface(exteriorSurface(recipe(spec), convexFaces));
-      model = buildPaperModel(spec);
+      model = buildPaperModel(spec, { useCache: false });
       auditNet(model);
     } catch (error) {
       console.log(`skip family=${family} seed=${seed}: ${error.message}`);
@@ -132,7 +135,10 @@ for (let family = 0; family < STUDY_FAMILIES.length; family++) {
 }
 const signatures = new Set();
 for (const entry of entries) {
-  const model = buildPaperModel({ kind: 'study', family: entry.family, seed: entry.seed }, nets[entry.id]);
+  const model = buildPaperModel(
+    { kind: 'study', family: entry.family, seed: entry.seed },
+    { net: nets[entry.id], useCache: false },
+  );
   auditNet(model);
   signatures.add([...new Set(model.vertices(1).flat().map(key))].sort().join('|'));
 }
