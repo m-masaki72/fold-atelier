@@ -39,6 +39,9 @@ npm start
 
 画像はブラウザ内で読み込み・保存します。外部APIやAPIキーは使いません。
 
+favicon、共有用画像・OGP、JSON-LD、サイトマップを同梱しています。
+公開先を変えるときは、3つのHTMLの公開URL、JSON-LD、`sitemap.xml`、`404.html` のリンクを更新してください。
+
 ## 開発する
 
 ```sh
@@ -49,7 +52,18 @@ npm run format         # 自作コードと文書の整形
 npm run generate:collection  # 100点のデータと見本画像を作り直す
 ```
 
-pushとプルリクエストでも、GitHub Actionsが `npm run verify` を実行します。
+実ブラウザで確認する場合は、初回にChromiumを用意します。
+
+```sh
+npx playwright install chromium
+npm run test:e2e
+```
+
+E2Eは専用の静的サーバーを起動し、画像の通信失敗、キー操作、PNG保存、画像の復元、音の切り替え、スマホの道具を確認します。
+Chromiumのソフトウェア描画を使います。Safariや実機の音声中断は別途確認が必要です。
+失敗時のトレースは `test-results/` に保存します。
+
+pushとプルリクエストでも、GitHub Actionsが `npm run verify` とE2Eを実行します。
 同梱ライブラリと生成データは整形対象から外しています。
 
 展開図は通常、同梱データを使います。作り直す場合は `buildPaperModel(spec, { useCache: false })`、

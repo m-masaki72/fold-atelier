@@ -6,19 +6,52 @@
     <meta name="theme-color" content="#efece4" />
     <meta
       name="description"
-      content="人、ねこ、家、ロケット。ことばから選んだ立体を、紙の展開図へひらく3Dアトリエ。"
+      content="一枚の展開図が、少しずつ立体になる3Dアトリエ。人・ねこ・ロケットなどの基本形と100点の立体で、折る順番や形のつながりを楽しめます。"
     />
     <title>FOLD — 折りかけの美術室</title>
-    <link
-      rel="icon"
-      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Crect width='40' height='40' rx='8' fill='%23ebe5d8'/%3E%3Cpath d='M9 30V10L29 15L20 22Z' fill='none' stroke='%239d492f' stroke-width='2'/%3E%3C/svg%3E"
+    <link rel="icon" type="image/svg+xml" sizes="any" href="./favicon.svg" />
+    <link rel="canonical" href="https://m-masaki72.github.io/fold-atelier/dist/fold.html" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="FOLD" />
+    <meta property="og:title" content="FOLD — 折りかけの美術室" />
+    <meta
+      property="og:description"
+      content="一枚の展開図が、少しずつ立体になる3Dアトリエ。人・ねこ・ロケットなどの基本形と100点の立体で、折る順番や形のつながりを楽しめます。"
     />
+    <meta property="og:url" content="https://m-masaki72.github.io/fold-atelier/dist/fold.html" />
+    <meta property="og:locale" content="ja_JP" />
+    <meta
+      property="og:image"
+      content="https://m-masaki72.github.io/fold-atelier/dist/images/fold/social-preview.jpg"
+    />
+    <meta property="og:image:alt" content="紙の立体を斜めから見ながら、一つずつ折るFOLDの画面" />
+    <meta name="twitter:card" content="summary_large_image" />
     <link rel="stylesheet" href="./fold.css" />
     <script type="importmap">
       { "imports": { "three": "./vendor/three.module.js" } }
     </script>
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "WebApplication",
+        "@id": "https://m-masaki72.github.io/fold-atelier/dist/fold.html#app",
+        "name": "FOLD — 折りかけの美術室",
+        "description": "一枚の展開図が、少しずつ立体になる3Dアトリエ。人・ねこ・ロケットなどの基本形と100点の立体で、折る順番や形のつながりを楽しめます。",
+        "url": "https://m-masaki72.github.io/fold-atelier/dist/fold.html",
+        "inLanguage": "ja",
+        "applicationCategory": "EducationalApplication",
+        "operatingSystem": "Web browser",
+        "browserRequirements": "WebGL 2対応ブラウザ",
+        "isAccessibleForFree": true,
+        "image": "https://m-masaki72.github.io/fold-atelier/dist/images/fold/social-preview.jpg",
+        "license": "https://github.com/m-masaki72/fold-atelier/blob/main/LICENSE"
+      }
+    </script>
   </head>
   <body>
+    <noscript>
+      <p>FOLDを使うには、JavaScriptを有効にしたWebGL 2対応ブラウザが必要です。</p>
+    </noscript>
     <header class="header">
       <a class="brand" href="./fold.html"
         ><svg viewBox="0 0 36 36" aria-hidden="true"><path d="M7 29V7L29 13L18 20Z M7 7L18 20V30" /></svg

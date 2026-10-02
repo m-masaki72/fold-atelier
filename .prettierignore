@@ -4,3 +4,5 @@ dist/js/fold-net-data.js
 dist/images/
 qa/
 package-lock.json
+test-results/
+playwright-report/

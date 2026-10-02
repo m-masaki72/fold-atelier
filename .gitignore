@@ -13,6 +13,8 @@ id_rsa*
 id_ed25519*
 *.log
 coverage/
+test-results/
+playwright-report/
 .venv/
 .idea/
 .vscode/
