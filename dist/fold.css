@@ -640,6 +640,23 @@ input[type='radio'] {
   color: var(--muted);
   font-size: 12px;
 }
+.share-links {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 16px;
+}
+.share-links a,
+.share-links button {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  color: var(--ink);
+}
+#share-url {
+  width: 100%;
+  min-width: 0;
+}
 #toast {
   position: fixed;
   left: 50%;

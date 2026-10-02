@@ -288,6 +288,19 @@ async function initializeView() {
 }
 
 function bindControls() {
+  $('#copy-link').addEventListener('click', async () => {
+    const input = $('#share-url');
+    try {
+      await navigator.clipboard.writeText(input.value);
+      input.hidden = true;
+      toast('共有URLをコピーしました。');
+    } catch {
+      input.hidden = false;
+      input.focus();
+      input.select();
+      toast('表示されたURLをコピーしてください。');
+    }
+  });
   range.addEventListener('input', () => {
     setTouring(false);
     setPlaying(false);

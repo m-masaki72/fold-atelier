@@ -29,7 +29,9 @@ test('site metadata, favicon, share image and sitemap point to the published app
   const touchIcon = await request.get('/dist/apple-touch-icon.png');
   expect(touchIcon.ok()).toBe(true);
   expect((await touchIcon.body()).subarray(0, 8)).toEqual(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]));
-  const imageResponse = await request.get('/dist/images/fold/social-preview.jpg');
+  const image = await page.locator('meta[property="og:image"]').getAttribute('content');
+  expect(image).toBe('https://m-masaki72.github.io/fold-atelier/dist/images/fold/ogp-paper.jpg');
+  const imageResponse = await request.get(new URL(image).pathname.replace('/fold-atelier', ''));
   expect(imageResponse.ok()).toBe(true);
   expect(imageResponse.headers()['content-type']).toContain('image/jpeg');
   for (const entry of ['/', '/dist/']) {
@@ -289,10 +291,7 @@ test('clearing in another tab closes tools and stops stale automatic saves', asy
   await expect(page.locator('#storage-reset')).toBeVisible();
   await expect(page.locator('#tools-dialog')).not.toBeVisible();
   expect(await page.locator('.workspace').evaluate((node) => node.inert)).toBe(true);
-  await page.evaluate(
-    () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))),
-  );
-  expect(await page.evaluate(() => window.__FOLD__.snapshot().audio.voices)).toBe(0);
+  await expect.poll(() => page.evaluate(() => window.__FOLD__.snapshot().audio.voices)).toBe(0);
   await page.close();
   await other.reload();
   await expect.poll(() => other.evaluate(() => window.__FOLD__?.snapshot().ready)).toBe(true);
@@ -386,4 +385,34 @@ test('dragging in focus mode returns the camera toggle to fixed', async ({ page 
   expect(await page.evaluate(() => window.__FOLD__.snapshot().cameraMode)).toBe('fixed');
   await page.locator('#focus-step').click();
   await expect(page.locator('#focus-step')).toHaveAttribute('aria-pressed', 'true');
+});
+
+test('share links use the public URL and copying has a manual fallback', async ({
+  page,
+  context,
+}, testInfo) => {
+  await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+  await openApp(page);
+  const canonical = 'https://m-masaki72.github.io/fold-atelier/dist/fold.html';
+  const links = page.getByRole('navigation', { name: 'FOLDを共有' }).getByRole('link');
+  await expect(links).toHaveCount(2);
+  for (const link of await links.all()) {
+    const url = new URL(await link.getAttribute('href'));
+    expect(url.searchParams.get('url')).toBe(canonical);
+    await expect(link).toHaveAttribute('rel', 'noopener noreferrer');
+  }
+  await page.getByRole('button', { name: 'URLをコピー' }).click();
+  expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(canonical);
+  await expect(page.locator('#toast')).toHaveText('共有URLをコピーしました。');
+  await page.evaluate(() => {
+    navigator.clipboard.writeText = async () => {
+      throw new Error('Clipboard blocked');
+    };
+  });
+  await page.getByRole('button', { name: 'URLをコピー' }).click();
+  await expect(page.getByRole('textbox', { name: '共有するURL' })).toBeVisible();
+  await expect(page.getByRole('textbox', { name: '共有するURL' })).toHaveValue(canonical);
+  await page.setViewportSize({ width: 390, height: 844 });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await page.screenshot({ path: testInfo.outputPath('share-mobile.png'), fullPage: true });
 });

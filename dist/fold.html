@@ -23,10 +23,18 @@
     <meta property="og:locale" content="ja_JP" />
     <meta
       property="og:image"
-      content="https://m-masaki72.github.io/fold-atelier/dist/images/fold/social-preview.jpg"
+      content="https://m-masaki72.github.io/fold-atelier/dist/images/fold/ogp-paper.jpg"
     />
-    <meta property="og:image:alt" content="紙の立体を斜めから見ながら、一つずつ折るFOLDの画面" />
+    <meta property="og:image:alt" content="展開図から紙の人とロケットができあがるFOLDのイメージ" />
+    <meta property="og:image:type" content="image/jpeg" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
     <meta name="twitter:card" content="summary_large_image" />
+    <meta
+      name="twitter:image"
+      content="https://m-masaki72.github.io/fold-atelier/dist/images/fold/ogp-paper.jpg"
+    />
+    <meta name="twitter:image:alt" content="展開図から紙の人とロケットができあがるFOLDのイメージ" />
     <link rel="stylesheet" href="./fold.css" />
     <script type="importmap">
       { "imports": { "three": "./vendor/three.module.js" } }
@@ -44,7 +52,7 @@
         "operatingSystem": "Web browser",
         "browserRequirements": "WebGL 2対応ブラウザ",
         "isAccessibleForFree": true,
-        "image": "https://m-masaki72.github.io/fold-atelier/dist/images/fold/social-preview.jpg",
+        "image": "https://m-masaki72.github.io/fold-atelier/dist/images/fold/ogp-paper.jpg",
         "license": "https://github.com/m-masaki72/fold-atelier/blob/main/LICENSE"
       }
     </script>
@@ -217,7 +225,31 @@
         <span id="save-status">このブラウザに自動保存</span>
         <button id="clear-saved-data" class="text-button" disabled>保存データを消す</button>
       </div>
-      <span>完成するまでの、すべてが作品。</span>
+      <nav class="share-links" aria-label="FOLDを共有">
+        <span>FOLDを共有</span>
+        <a
+          href="https://twitter.com/intent/tweet?url=https%3A%2F%2Fm-masaki72.github.io%2Ffold-atelier%2Fdist%2Ffold.html&amp;text=FOLD%20%E2%80%94%20%E6%8A%98%E3%82%8A%E3%81%8B%E3%81%91%E3%81%AE%E7%BE%8E%E8%A1%93%E5%AE%A4"
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label="Xで共有（新しいタブで開く）"
+          >X ↗</a
+        >
+        <a
+          href="https://social-plugins.line.me/lineit/share?url=https%3A%2F%2Fm-masaki72.github.io%2Ffold-atelier%2Fdist%2Ffold.html"
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label="LINEで共有（新しいタブで開く）"
+          >LINE ↗</a
+        >
+        <button id="copy-link" class="text-button">URLをコピー</button>
+        <input
+          id="share-url"
+          aria-label="共有するURL"
+          value="https://m-masaki72.github.io/fold-atelier/dist/fold.html"
+          readonly
+          hidden
+        />
+      </nav>
     </footer>
     <p id="toast" role="status" hidden></p>
     <dialog id="clear-data-dialog" aria-labelledby="clear-data-title">
