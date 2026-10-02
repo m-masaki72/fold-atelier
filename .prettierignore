@@ -1,0 +1,6 @@
+node_modules/
+dist/vendor/
+dist/js/fold-net-data.js
+dist/images/
+qa/
+package-lock.json

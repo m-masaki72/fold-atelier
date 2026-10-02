@@ -7,7 +7,7 @@
 
 ## 起動する
 
-Node.jsとPython 3を用意し、このフォルダで実行します。
+Node.js 24以上とPython 3を用意し、このフォルダで実行します。
 
 ```sh
 npm ci
@@ -44,8 +44,17 @@ npm start
 ```sh
 npm run check          # JavaScriptの構文確認
 npm test               # 形状・描画部品・画像・保存のテスト
+npm run verify         # 構文・Lint・整形・テストをまとめて確認
+npm run format         # 自作コードと文書の整形
 npm run generate:collection  # 100点のデータと見本画像を作り直す
 ```
+
+pushとプルリクエストでも、GitHub Actionsが `npm run verify` を実行します。
+同梱ライブラリと生成データは整形対象から外しています。
+
+展開図は通常、同梱データを使います。作り直す場合は `buildPaperModel(spec, { useCache: false })`、
+保存した展開図を復元する場合は `buildPaperModel(spec, { net })` を使います。
+生成スクリプトは同梱キャッシュを使わず、`--resume` の場合だけ途中保存から再開します。
 
 コードは役割ごとに分けています。画面を読むなら `dist/js/fold.js` から始めてください。
 
@@ -53,6 +62,7 @@ npm run generate:collection  # 100点のデータと見本画像を作り直す
 | -------------------------------------------------------- | ---------------------------------------- |
 | `fold.js`                                                | 起動、操作、再生、保存の連携             |
 | `fold-gallery.js` / `fold-artwork.js`                    | 作品選びと履歴 / 画像の読み込みと保存    |
+| `fold-history.js` / `fold-lifecycle.js`                  | 作品履歴 / 起動と保存・復元の順序        |
 | `fold-recipes.js` / `fold-collection.js`                 | 基本形と100点の形状レシピ                |
 | `fold-topology.js` / `fold-net.js` / `fold-models.js`    | 外側の面 / 展開と回転 / モデルの組み立て |
 | `fold-view.js` / `fold-paper-mesh.js`                    | カメラと描画 / 紙・線・材質              |
