@@ -1,0 +1,11 @@
+node_modules/
+__pycache__/
+*.py[cod]
+.DS_Store
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+qa/fold/backups/
+qa/fold/collection-progress.json

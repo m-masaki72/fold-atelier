@@ -1,0 +1,7 @@
+{
+  "tool": "built-in image_gen",
+  "title": "日輪をわたる",
+  "asset": "crane.png",
+  "prompt": "Use case: illustration-story. Asset type: a square original painting to be projected geometrically across adjacent folded paper cube faces in an interactive artwork. Primary request: A graceful white crane with a bright red crown, its two broad wings outstretched in an elegant asymmetric arc, flying across a large vermilion-red sun over dark indigo water. Style: sophisticated Japanese woodblock print meets contemporary cut-paper art; graphic flat shapes, delicate visible washi fiber texture, restrained ivory, midnight blue, teal and vermilion palette. Composition: one continuous image, clearly legible crane silhouette centered, head slightly right of center, wings extending left and right; large sun behind the crane; flowing indigo waves across the bottom quarter. Full-bleed square artwork, not a photograph of paper. Keep all important subject matter within the middle 80 percent. No text, no letters, no border, no mockup, no 3D object, no folds, no grid, no collage.",
+  "generatedAt": "2026-09-30"
+}

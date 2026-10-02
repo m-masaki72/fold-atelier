@@ -1,0 +1,20 @@
+{
+  "name": "fold-atelier",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "python3 -B fold_server.py",
+    "start:fold": "python3 -B fold_server.py",
+    "check": "node check-syntax.mjs",
+    "test": "node --test test-fold*.mjs && python3 -B test_fold_server.py",
+    "test:fold": "npm test",
+    "generate:collection": "node generate-fold-collection.mjs"
+  },
+  "dependencies": {
+    "three": "0.180.0"
+  },
+  "devDependencies": {
+    "prettier": "3.9.9"
+  }
+}

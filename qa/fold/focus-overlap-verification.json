@@ -1,0 +1,34 @@
+{
+  "date": "2026-09-30",
+  "changes": [
+    "Oblique focus candidates based on both hinge faces, with visibility and continuity scoring",
+    "Stable per-face depth bias for opaque coplanar surfaces",
+    "Shared sort depth for coplanar transparent surfaces",
+    "Moving-face highlight integrated into paper shaders",
+    "Completed shape reference, single-hinge replay, direction and camera status labels"
+  ],
+  "automated": {
+    "foldTestsPassed": 35,
+    "syntaxModulesPassed": 99,
+    "cameraRegression": "All 10 presets plus study-077 and study-100; 464 hinges at 9 phases",
+    "overlapRegression": "study-077 at 80%, coincident faces 77 and 91 retain stable depth and blend order across camera directions"
+  },
+  "browser": {
+    "surfaceChecks": "study-077 at 80%, camera orbit with washi/tracing and artwork",
+    "focusChecks": ["person at 58%", "cube at 10%", "study-032 last hinge"],
+    "replayChecks": ["one step ends paused", "repeat retains the same step", "main pause button stops a replay", "completed model replays last physical hinge"],
+    "previewChecked": true,
+    "restorationChecked": true,
+    "desktopWidth": 1366,
+    "mobileWidth": 390,
+    "mobileScrollWidth": 390,
+    "consoleErrorsOrWarningsAfterReload": [],
+    "viewportOverrideReset": true,
+    "finalSelection": "study-032, tracing, focus, autoplay, sound off"
+  },
+  "limitations": [
+    "Rendering order is stabilized; intermediate physical face intersections are not prevented",
+    "Other parts can still occlude a hinge in complex models"
+  ],
+  "screenshots": ["focus-oblique-desktop.png", "focus-oblique-mobile.png"]
+}

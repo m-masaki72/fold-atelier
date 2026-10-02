@@ -1,0 +1,290 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#efece4" />
+    <meta
+      name="description"
+      content="人、ねこ、家、ロケット。ことばから選んだ立体を、紙の展開図へひらく3Dアトリエ。"
+    />
+    <title>FOLD — 折りかけの美術室</title>
+    <link
+      rel="icon"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Crect width='40' height='40' rx='8' fill='%23ebe5d8'/%3E%3Cpath d='M9 30V10L29 15L20 22Z' fill='none' stroke='%239d492f' stroke-width='2'/%3E%3C/svg%3E"
+    />
+    <link rel="stylesheet" href="./fold.css" />
+    <script type="importmap">
+      { "imports": { "three": "./vendor/three.module.js" } }
+    </script>
+  </head>
+  <body>
+    <header class="header">
+      <a class="brand" href="./fold.html"
+        ><svg viewBox="0 0 36 36" aria-hidden="true"><path d="M7 29V7L29 13L18 20Z M7 7L18 20V30" /></svg
+        ><span>FOLD</span><span class="brand-caption">折りかけの美術室</span></a
+      >
+      <div class="header-tools">
+        <button id="sound-toggle" class="text-button" aria-pressed="false">♪ 音 OFF</button>
+        <details class="volume-menu">
+          <summary>音量</summary>
+          <div class="popover">
+            <h2>音の設定</h2>
+            <label for="bgm-volume">BGM <output id="bgm-value">32%</output></label
+            ><input id="bgm-volume" type="range" min="0" max="100" value="32" />
+            <label for="se-volume">折る音 <output id="se-value">55%</output></label
+            ><input id="se-volume" type="range" min="0" max="100" value="55" />
+            <p>静かな音楽と、紙のささやき。<br />音量0で、それぞれOFFにできます。</p>
+          </div>
+        </details>
+        <button id="capture">画像を保存 <span aria-hidden="true">↗</span></button>
+      </div>
+    </header>
+    <main class="workspace">
+      <div class="model-area">
+        <section class="stage" aria-label="紙の立体作品">
+          <div class="stage-top">
+            <div>
+              <h1 id="model-title">ブロックの人</h1>
+              <p id="seam-message">つながる一枚の展開図</p>
+              <span id="phase-label" class="badge">展開図</span>
+            </div>
+            <button id="preview-open" class="completed-preview" aria-label="完成見本を大きく見る">
+              <svg id="completed-mini" aria-hidden="true"></svg><span>完成見本 ↗</span>
+            </button>
+          </div>
+          <div class="canvas-wrap">
+            <div
+              id="fold-viewport"
+              tabindex="0"
+              aria-label="紙の3D作品。ドラッグで回転、スクロールで拡大。矢印キーで折り、スペースで再生。"
+            ></div>
+            <div id="loading" role="status">紙を用意しています…</div>
+          </div>
+          <div class="stage-bottom">
+            <span class="view-hint">ドラッグで回転 · スクロールで拡大</span
+            ><span id="net-legend" hidden>実線は切る線 · 破線は折り目</span>
+          </div>
+          <div class="stage-actions">
+            <div class="camera-group">
+              <span class="camera-label">カメラ</span>
+              <div class="segmented" aria-label="カメラモード">
+                <button id="camera-fixed" aria-pressed="true">定点</button
+                ><button id="focus-step" aria-pressed="false">フォーカス</button>
+              </div>
+            </div>
+            <details class="view-menu">
+              <summary>向き <span aria-hidden="true">⌄</span></summary>
+              <div class="view-options">
+                <button id="reset-view">向きだけ戻す</button><button id="view-top">真上から</button>
+              </div>
+            </details>
+          </div>
+          <div class="camera-status">
+            <span id="camera-status">定点：同じ位置から、全体を見る</span
+            ><button id="camera-resume" class="text-button" hidden>追従を再開</button>
+          </div>
+        </section>
+        <section class="controls" aria-label="紙を折る">
+          <div class="controls-inner">
+            <div class="fold-heading">
+              <div class="step-info">
+                <output id="step-current">1 / 42</output><span id="step-detail">最初の折り目</span>
+              </div>
+            </div>
+            <div class="step-controls">
+              <button id="step-prev" aria-label="一つ前の折り目へ">← 前へ</button>
+              <button id="play" class="primary play-button" aria-label="ゆっくり折る" aria-pressed="false">
+                <span id="play-icon" aria-hidden="true">▷</span><span id="play-label">再生する</span>
+              </button>
+              <button id="step-next" aria-label="次の折り目へ">次へ →</button>
+            </div>
+            <div class="play-feedback">
+              <span id="play-state">組み立て中</span>
+              <button id="step-replay" class="text-button">この折り目をもう一度 ↻</button>
+            </div>
+            <div class="slider-block">
+              <label for="fold-range">折り具合</label
+              ><input id="fold-range" type="range" min="0" max="100" value="0" step="0.1" /><span
+                class="fold-readout"
+                ><output id="fold-value" for="fold-range">0</output>%</span
+              >
+            </div>
+            <div class="stops">
+              <button data-fold="0">展開図</button><button data-fold="58">折りかけ</button
+              ><button data-fold="100">完成形</button>
+            </div>
+          </div>
+        </section>
+        <nav class="mobile-tools" aria-label="作品の道具">
+          <button data-tool="works">作品を選ぶ</button><button data-tool="paper">紙と絵</button
+          ><button data-tool="prompt">ことばで作る</button>
+        </nav>
+      </div>
+      <div id="tools-slot" class="tools-slot">
+        <aside id="tools-content" class="tools-content" aria-label="作品の道具">
+          <section id="tool-works" class="tool-section collection-section">
+            <div class="section-heading">
+              <h2>作品を選ぶ</h2>
+              <span id="collection-count">100点</span>
+            </div>
+            <label for="model-select">かたち</label
+            ><select id="model-select" aria-label="立体の形"></select>
+            <button id="collection-open" class="collection-open">100作品を見る <span>↗</span></button>
+            <div class="collection-controls">
+              <button id="collection-prev" aria-label="前の立体">← 前の作品</button
+              ><button id="collection-next">ランダム ↝</button
+              ><button id="collection-tour" aria-label="100点を連続再生" aria-pressed="false">
+                ▷ 連続で見る
+              </button>
+            </div>
+            <p id="collection-current" aria-live="polite">
+              気になる形を選んで、<br />一枚の紙から組み立てる。
+            </p>
+          </section>
+          <details id="tool-paper" class="tool-section tool-details">
+            <summary>
+              <span>紙と絵<small id="paper-summary">和紙 · 絵なし</small></span>
+            </summary>
+            <div class="tool-body">
+              <fieldset class="paper-select">
+                <legend>紙の質感</legend>
+                <div class="paper-options">
+                  <label><input type="radio" name="paper" value="washi" checked />和紙</label
+                  ><label><input type="radio" name="paper" value="tracing" />透ける紙</label>
+                </div>
+              </fieldset>
+              <div class="art-card">
+                <button id="source-open" class="artwork" aria-label="元の絵を見る">
+                  <img id="art-thumbnail" src="./images/fold/crane.png" alt="赤い太陽を背に飛ぶ白い鶴" />
+                </button>
+                <div>
+                  <strong id="art-title">日輪をわたる</strong
+                  ><small id="art-credit">IMAGEGEN · ORIGINAL ARTWORK</small>
+                </div>
+              </div>
+              <button id="art-mode" class="full" aria-pressed="false">この絵をのせる ↗</button>
+              <div class="art-actions">
+                <button id="art-open" class="text-button">絵を変える ↗</button
+                ><button id="align-view" class="text-button">
+                  完成した姿を見る <span aria-hidden="true">↗</span>
+                </button>
+              </div>
+            </div>
+          </details>
+          <details id="tool-prompt" class="tool-section tool-details">
+            <summary>
+              <span
+                >ことばで作る<small><span class="mock-badge">生成モック</span> 形・色・背丈</small></span
+              >
+            </summary>
+            <div class="tool-body">
+              <p>対応する形を、ことばで調整します。</p>
+              <form id="model-form">
+                <label for="model-prompt">つくりたい立体</label
+                ><textarea
+                  id="model-prompt"
+                  rows="3"
+                  maxlength="180"
+                  placeholder="例：赤い、背の高いロボット"
+                >
+青い服のブロックの人</textarea
+                ><button id="model-generate" class="primary full" type="submit">立体をつくる ↗</button>
+              </form>
+              <div class="prompt-examples" aria-label="プロンプトの例">
+                <button data-prompt="青い服のブロックの人">人</button
+                ><button data-prompt="赤い、背の高いロボット">ロボット</button
+                ><button data-prompt="オレンジのねこ">ねこ</button
+                ><button data-prompt="赤い屋根の小さな家">家</button
+                ><button data-prompt="青いロケット">ロケット</button
+                ><button data-prompt="紫色のお城">お城</button>
+              </div>
+              <p id="model-status" role="status">形・色・背丈を読み取り、一枚につながる展開図へ。</p>
+              <p class="mock-note">
+                用意した形を組み立てるモックです。<br />未知の立体を生成するAIではありません。
+              </p>
+            </div>
+          </details>
+          <div class="tool-foot">
+            <p>ひらいて、折って、組み立てる。<br />複雑な世界も、一枚から。</p>
+            <p>Space：再生 / 停止<br />← →：工程を移動</p>
+          </div>
+        </aside>
+      </div>
+    </main>
+    <footer class="footer">
+      <span id="save-status">このブラウザに自動保存</span><span>完成するまでの、すべてが作品。</span>
+    </footer>
+    <p id="toast" role="status" hidden></p>
+    <dialog id="preview-dialog" aria-labelledby="preview-title">
+      <form method="dialog" class="dialog-heading">
+        <h2 id="preview-title">かたちの完成見本</h2>
+        <button class="close" aria-label="完成見本を閉じる">×</button>
+      </form>
+      <svg
+        id="completed-large"
+        class="completed-large"
+        role="img"
+        aria-label="完成した立体。いま折っている部分を黄色で表示"
+      ></svg>
+      <p class="dialog-lead">黄色い部分が、いま折っている面です。裏側にある面は、黄色の破線で示します。</p>
+    </dialog>
+    <dialog id="tools-dialog" aria-labelledby="tools-title">
+      <form method="dialog" class="dialog-heading">
+        <h2 id="tools-title">作品を選ぶ</h2>
+        <button class="close" aria-label="道具を閉じる">×</button>
+      </form>
+      <div id="tools-body"></div>
+    </dialog>
+    <dialog id="collection-dialog" aria-labelledby="collection-title">
+      <form method="dialog" class="dialog-heading">
+        <span class="eyebrow">100 PAPER OBJECTS</span
+        ><button class="close" aria-label="コレクションを閉じる">×</button>
+      </form>
+      <h2 id="collection-title">複雑な世界も、一枚から。</h2>
+      <p class="dialog-lead">100の立体をランダムに生成しました。気になる形を選んで、ほどいてみてください。</p>
+      <div class="collection-filter">
+        <label for="collection-family">かたちの仲間</label
+        ><select id="collection-family">
+          <option value="all">すべての100点</option></select
+        ><span id="collection-results">100点</span>
+      </div>
+      <div id="collection-grid" class="collection-grid"></div>
+    </dialog>
+    <dialog id="art-dialog">
+      <form method="dialog" class="dialog-heading">
+        <span class="eyebrow">A NEW PICTURE</span><button class="close" aria-label="閉じる">×</button>
+      </form>
+      <h2>次は、何を折ろう。</h2>
+      <p class="dialog-lead">絵が変わると、折りかけの景色も変わる。</p>
+      <form id="generate-form">
+        <label for="art-prompt">描いてほしい景色</label
+        ><textarea
+          id="art-prompt"
+          maxlength="1200"
+          rows="3"
+          placeholder="例えば、月明かりを泳ぐ青い鯨"
+        ></textarea
+        ><button id="generate" class="primary" disabled>絵を生成して、紙にのせる <span>↗</span></button>
+        <p id="generation-status" role="status">画像生成への接続を確認しています。</p>
+      </form>
+      <div class="or"><span>または</span></div>
+      <label class="upload-label" for="image-upload"
+        >手元の絵をひらく <span>JPG / PNG / WebP · 10 MBまで</span></label
+      ><input id="image-upload" type="file" accept="image/png,image/jpeg,image/webp" class="sr-only" /><button
+        id="restore-art"
+        class="text-button restore"
+      >
+        「日輪をわたる」に戻す
+      </button>
+    </dialog>
+    <dialog id="source-dialog">
+      <form method="dialog" class="dialog-heading">
+        <span class="eyebrow">THE ORIGINAL</span><button class="close" aria-label="閉じる">×</button>
+      </form>
+      <img id="source-image" src="./images/fold/crane.png" alt="立体に配置した元の絵" />
+      <p>この絵を、立体の面へつなげて配置しています。</p>
+    </dialog>
+    <script type="module" src="./fold.js"></script>
+  </body>
+</html>
