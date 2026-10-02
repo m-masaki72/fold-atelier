@@ -5,12 +5,12 @@
   "license": "MIT",
   "type": "module",
   "scripts": {
-    "start": "python3 -B fold_server.py",
-    "start:fold": "python3 -B fold_server.py",
-    "check": "node check-syntax.mjs",
-    "test": "node --test test-fold*.mjs && python3 -B test_fold_server.py",
+    "start": "python3 -B -m http.server 8766 --bind 127.0.0.1 --directory dist",
+    "start:fold": "npm start",
+    "check": "node tools/check-syntax.mjs",
+    "test": "node --test tests/test-fold*.mjs",
     "test:fold": "npm test",
-    "generate:collection": "node generate-fold-collection.mjs"
+    "generate:collection": "node tools/generate-fold-collection.mjs"
   },
   "dependencies": {
     "three": "0.180.0"

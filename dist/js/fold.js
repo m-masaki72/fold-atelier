@@ -21,7 +21,6 @@ const state = {
   paper: 'washi',
   artwork: '日輪をわたる',
   imageSource: './images/fold/crane.png',
-  generating: false,
   model: 'person',
   modelGenerating: false,
   artMode: false,
@@ -457,7 +456,7 @@ async function init() {
     setTimeout(() => URL.revokeObjectURL(link.href), 5000);
     toast('この瞬間を保存しました。');
   });
-  await artwork.init();
+  artwork.init();
   await restoreSession();
   state.ready = true;
   requestAnimationFrame(frame);
@@ -467,7 +466,6 @@ async function init() {
     snapshot: () => ({
       ...state,
       imageSource: state.imageSource.startsWith('blob:') ? 'local-image' : state.imageSource,
-      generationAvailable: artwork.generationAvailable,
       animating: !!animation,
       camera: view.camera.position.toArray(),
       target: view.controls.target.toArray(),

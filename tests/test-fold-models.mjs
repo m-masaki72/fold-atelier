@@ -9,7 +9,7 @@ import {
   polygonsOverlap,
   recipe,
   convexFaces,
-} from './dist/fold-models.js';
+} from '../dist/js/fold-models.js';
 
 const key = (p) =>
   p

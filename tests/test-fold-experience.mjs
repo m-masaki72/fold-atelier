@@ -1,12 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
-import { buildPaperModel } from './dist/fold-models.js';
-import { VIEW_DIRECTION } from './dist/fold-geometry.js';
-import { fixedCameraPoints, focusCameraFrame } from './dist/fold-camera.js';
-import { fitPaperFrame } from './dist/fold-display.js';
-import { paperTone, paperRustle, audibleFold } from './dist/fold-audio.js';
-import { validateSession, writeSession, readSession } from './dist/fold-session.js';
+import { buildPaperModel } from '../dist/js/fold-models.js';
+import { VIEW_DIRECTION } from '../dist/js/fold-geometry.js';
+import { fixedCameraPoints, focusCameraFrame } from '../dist/js/fold-camera.js';
+import { fitPaperFrame } from '../dist/js/fold-display.js';
+import { paperTone, paperRustle, audibleFold } from '../dist/js/fold-audio.js';
+import { validateSession, writeSession, readSession } from '../dist/js/fold-session.js';
 
 test('a fixed camera contains every assembly stage without moving or changing its zoom', () => {
   const direction = VIEW_DIRECTION.clone().normalize();

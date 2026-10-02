@@ -2,18 +2,17 @@ import { imageStore } from './fold-session.js';
 const $ = (selector) => document.querySelector(selector);
 
 export function createArtwork({ view, state, setArtMode, goTo, closeTools, toast, saveSession }) {
-  let generationAvailable = false;
   let requestId = 0;
   let saveQueue = Promise.resolve();
   const imageURLs = new Set(state.imageSource.startsWith('blob:') ? [state.imageSource] : []);
 
-  function startRequest() {
-    if (state.generating) busy(false);
-    return ++requestId;
-  }
-
   function releaseImage(source) {
     if (imageURLs.delete(source)) URL.revokeObjectURL(source);
+  }
+
+  function showImageError(message) {
+    $('#image-status').textContent = message;
+    toast(message);
   }
 
   async function loadImage(source, title, credit, request, imageKey = null) {
@@ -77,60 +76,14 @@ export function createArtwork({ view, state, setArtMode, goTo, closeTools, toast
     }
   }
 
-  function busy(value) {
-    state.generating = value;
-    $('#art-dialog').classList.toggle('busy', value);
-    $('#generate').disabled = value || !generationAvailable;
-    $('#art-prompt').disabled = value;
-    $('#image-upload').disabled = value;
-    $('#restore-art').disabled = value;
-  }
-
-  async function generate(event) {
-    event.preventDefault();
-    const request = startRequest();
-    const prompt = $('#art-prompt').value.trim();
-    if (!prompt) {
-      $('#art-prompt').focus();
-      return;
-    }
-    busy(true);
-    $('#generation-status').textContent = '絵を描いています。そのまま紙を眺めながらお待ちください。';
-    const timeout = new AbortController();
-    const timer = setTimeout(() => timeout.abort(), 190000);
-    try {
-      const response = await fetch('/api/fold/generate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt }),
-        signal: timeout.signal,
-      });
-      const payload = await response.json();
-      if (request !== requestId) return;
-      if (!response.ok) throw new Error(payload.error || '絵を生成できませんでした。');
-      const blob = await (await fetch(`data:image/png;base64,${payload.image}`)).blob();
-      if (!(await applyBlob(blob, prompt.slice(0, 32), 'IMAGEGEN · CREATED JUST NOW', request))) return;
-      $('#generation-status').textContent = '新しい絵を紙にのせました。';
-      toast(`新しい絵を、${view.model.faces.length}面につなぎました。`);
-    } catch (error) {
-      if (request === requestId)
-        $('#generation-status').textContent =
-          error.name === 'AbortError'
-            ? '生成に時間がかかっています。しばらくしてから再度お試しください。'
-            : error.message;
-    } finally {
-      clearTimeout(timer);
-      if (request === requestId) busy(false);
-    }
-  }
-
   async function upload(event) {
     const file = event.target.files[0];
     event.target.value = '';
     if (!file) return;
-    const request = startRequest();
+    $('#image-status').textContent = '';
+    const request = ++requestId;
     if (!['image/png', 'image/jpeg', 'image/webp'].includes(file.type) || file.size > 10 * 1024 * 1024) {
-      toast('10 MB以下の JPG・PNG・WebP を選んでください。');
+      showImageError('10 MB以下の JPG・PNG・WebP を選んでください。');
       return;
     }
     const url = URL.createObjectURL(file);
@@ -165,49 +118,32 @@ export function createArtwork({ view, state, setArtMode, goTo, closeTools, toast
         return;
       toast('あなたの絵を、紙にのせました。');
     } catch {
-      if (request === requestId) toast('画像を読み込めませんでした。別の画像でお試しください。');
+      if (request === requestId) showImageError('画像を読み込めませんでした。別の画像でお試しください。');
     } finally {
       URL.revokeObjectURL(url);
     }
   }
 
-  async function init() {
-    $('#art-open').addEventListener('click', () => $('#art-dialog').showModal());
+  function init() {
+    $('#art-open').addEventListener('click', () => {
+      $('#image-status').textContent = '';
+      $('#art-dialog').showModal();
+    });
     $('#source-open').addEventListener('click', () => $('#source-dialog').showModal());
     $('#restore-art').addEventListener('click', () => {
-      const request = startRequest();
-      return applyImage(
-        './images/fold/crane.png',
-        '日輪をわたる',
-        'IMAGEGEN · ORIGINAL ARTWORK',
-        request,
-      ).catch(() => {
-        if (request === requestId) toast('元の絵を読み込めませんでした。');
+      $('#image-status').textContent = '';
+      const request = ++requestId;
+      return applyImage('./images/fold/crane.png', '日輪をわたる', 'ORIGINAL ARTWORK', request).catch(() => {
+        if (request === requestId) showImageError('元の絵を読み込めませんでした。');
       });
     });
     $('#image-upload').addEventListener('change', upload);
-    $('#generate-form').addEventListener('submit', generate);
-    try {
-      const response = await fetch('/api/fold/config');
-      if (!response.ok) throw new Error();
-      const config = await response.json();
-      generationAvailable = config.generationAvailable === true;
-    } catch {
-      generationAvailable = false;
-    }
-    busy(false);
-    $('#generation-status').textContent = generationAvailable
-      ? '描いた絵を、その場で立体の面へ。生成には少し時間がかかります。'
-      : '画像生成は未接続です。いまは手元の画像か、この作品の絵で楽しめます。';
   }
   async function restore(image) {
-    return applyBlob(image.blob, image.title, image.credit, startRequest(), image.key);
+    return applyBlob(image.blob, image.title, image.credit, ++requestId, image.key);
   }
   return {
     init,
     restore,
-    get generationAvailable() {
-      return generationAvailable;
-    },
   };
 }

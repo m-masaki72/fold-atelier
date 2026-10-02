@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
-import { buildPaperModel, polygonsOverlap } from './dist/fold-models.js';
+import { buildPaperModel, polygonsOverlap } from '../dist/js/fold-models.js';
 
 test('new proportions search a connected net that can be saved and restored without changing folding', () => {
   for (const kind of ['cube', 'tetrahedron', 'octahedron']) {

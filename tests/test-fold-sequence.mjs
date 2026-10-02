@@ -1,10 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildPaperModel } from './dist/fold-models.js';
-import { advancePlayback, END_HOLD_SECONDS } from './dist/fold-sequence.js';
+import { buildPaperModel } from '../dist/js/fold-models.js';
+import { advancePlayback, END_HOLD_SECONDS } from '../dist/js/fold-sequence.js';
 import * as THREE from 'three';
-import { paperWallPositions, foldFramePoints, fitPaperFrame } from './dist/fold-display.js';
-import { VIEW_DIRECTION } from './dist/fold-geometry.js';
+import { paperWallPositions, foldFramePoints, fitPaperFrame } from '../dist/js/fold-display.js';
+import { VIEW_DIRECTION } from '../dist/js/fold-geometry.js';
 
 for (const kind of ['cube', 'person', 'cat', 'study-077']) {
   test(`${kind}: exactly one physical hinge rotates at a time, from leaves toward the root`, () => {

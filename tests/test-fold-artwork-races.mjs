@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createArtwork } from './dist/fold-artwork.js';
+import { createArtwork } from '../dist/js/fold-artwork.js';
 
 const deferred = () => {
   let resolve;
@@ -24,13 +24,13 @@ async function fixture(t) {
     revoked = [],
     displayed = [],
     writes = [],
-    toasts = [];
+    toasts = [],
+    fetches = [];
   const controls = {
     decode: async () => {},
     encode: (blob, callback) => callback(blob),
     read: async (source) => (await nativeFetch(source)).blob(),
     write: async () => {},
-    generate: async () => ({ image: 'aW1hZ2U=' }),
     setImage: async () => true,
   };
   const elements = new Map();
@@ -105,10 +105,9 @@ async function fixture(t) {
     },
   };
   t.mock.method(globalThis, 'fetch', async (source) => {
-    if (source === '/api/fold/config') return { ok: true, json: async () => ({ generationAvailable: true }) };
-    if (source === '/api/fold/generate') return { ok: true, json: () => controls.generate() };
-    if (source.startsWith('blob:')) return { blob: () => controls.read(source) };
-    return nativeFetch(source);
+    fetches.push(source);
+    assert.ok(source.startsWith('blob:'), 'Artwork must only read local image data');
+    return { blob: () => controls.read(source) };
   });
   const createURL = URL.createObjectURL.bind(URL),
     revokeURL = URL.revokeObjectURL.bind(URL);
@@ -142,7 +141,7 @@ async function fixture(t) {
     saveSession() {},
     toast: (message) => toasts.push(message),
   });
-  await artwork.init();
+  const initResult = artwork.init();
   return {
     artwork,
     state,
@@ -152,26 +151,63 @@ async function fixture(t) {
     displayed,
     writes,
     toasts,
+    fetches,
+    initResult,
     get stored() {
       return stored;
     },
     get maximumWrites() {
       return maximumWrites;
     },
-    upload(name) {
-      const file = new Blob([name], { type: 'image/png' });
+    get imageStatus() {
+      return element('#image-status').textContent;
+    },
+    upload(name, type = 'image/png') {
+      const file = new Blob([name], { type });
       file.name = `${name}.png`;
       return element('#image-upload').listeners.change({ target: { files: [file], value: '' } });
     },
     original: () => element('#restore-art').listeners.click(),
-    generate() {
-      element('#art-prompt').value = 'Generated';
-      return element('#generate-form').listeners.submit({ preventDefault() {} });
-    },
+    open: () => element('#art-open').listeners.click(),
   };
 }
 
 const saved = (key) => ({ key, blob: new Blob([key]), title: key, credit: 'Test' });
+
+test('artwork initialization is synchronous and does not make a network request', async (t) => {
+  const f = await fixture(t);
+  assert.equal(f.initResult, undefined);
+  assert.deepEqual(f.fetches, []);
+});
+
+test('invalid uploads report inside the dialog and a new attempt clears the error', async (t) => {
+  const f = await fixture(t);
+  await f.upload('Unsupported', 'image/gif');
+  assert.equal(f.imageStatus, '10 MB以下の JPG・PNG・WebP を選んでください。');
+  assert.equal(f.state.artwork, 'Original');
+  assert.equal(f.created.length, 0);
+  f.open();
+  assert.equal(f.imageStatus, '');
+  await f.upload('Unsupported', 'image/gif');
+  const upload = f.upload('Valid');
+  assert.equal(f.imageStatus, '');
+  await upload;
+});
+
+test('decode and default-picture failures report inside the dialog', async (t) => {
+  const f = await fixture(t);
+  f.controls.decode = async () => {
+    throw new Error('Cannot decode');
+  };
+  await f.upload('Unreadable');
+  assert.equal(f.imageStatus, '画像を読み込めませんでした。別の画像でお試しください。');
+  f.controls.setImage = async () => {
+    throw new Error('Missing image');
+  };
+  await f.original();
+  assert.equal(f.imageStatus, '元の絵を読み込めませんでした。');
+  assert.equal(f.state.artwork, 'Original');
+});
 
 test('an earlier upload finishing decode cannot replace a newer upload', async (t) => {
   const f = await fixture(t),
@@ -206,18 +242,20 @@ test('returning to the original picture supersedes an upload during canvas conve
   assert.equal(f.revoked.length, 1);
 });
 
-test('restoring a saved picture supersedes an outstanding generation response', async (t) => {
+test('restoring a saved picture supersedes an upload still decoding', async (t) => {
   const f = await fixture(t),
-    generation = deferred();
-  f.controls.generate = () => generation.promise;
-  const pending = f.generate();
+    decode = deferred();
+  f.controls.decode = () => decode.promise;
+  const pending = f.upload('Earlier');
+  const uploadURL = f.created[0];
   await f.artwork.restore(saved('Restored'));
-  generation.resolve({ image: 'aW1hZ2U=' });
+  decode.resolve();
   await pending;
   assert.equal(f.state.artwork, 'Restored');
   assert.equal(f.state.imageKey, 'Restored');
-  assert.equal(f.state.generating, false);
   assert.equal(f.displayed.length, 1);
+  assert.equal(f.revoked.filter((url) => url === uploadURL).length, 1);
+  assert.equal(f.revoked.includes(f.state.imageSource), false);
 });
 
 test('a superseded texture load reports false and releases only its unused URL', async (t) => {

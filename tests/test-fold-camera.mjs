@@ -1,9 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
-import { buildPaperModel, MODEL_PRESETS } from './dist/fold-models.js';
-import { focusCameraFrame } from './dist/fold-camera.js';
-import { VIEW_DIRECTION } from './dist/fold-geometry.js';
+import { buildPaperModel, MODEL_PRESETS } from '../dist/js/fold-models.js';
+import { focusCameraFrame } from '../dist/js/fold-camera.js';
+import { VIEW_DIRECTION } from '../dist/js/fold-geometry.js';
 
 test('focus keeps both hinge faces oblique throughout convex and concave folds', () => {
   const angles = new Set();

@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createArtwork } from './dist/fold-artwork.js';
-import { FoldView } from './dist/fold-view.js';
+import { createArtwork } from '../dist/js/fold-artwork.js';
+import { FoldView } from '../dist/js/fold-view.js';
 import * as THREE from 'three';
 
 function artworkFixture(t, setImage) {

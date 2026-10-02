@@ -1,8 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
-import { buildPaperModel } from './dist/fold-models.js';
-import { artworkProjection, VIEW_DIRECTION } from './dist/fold-geometry.js';
+import { buildPaperModel } from '../dist/js/fold-models.js';
+import { artworkProjection, VIEW_DIRECTION } from '../dist/js/fold-geometry.js';
 
 test('flat net has six non-overlapping squares with five common hinges', () => {
   const model = buildPaperModel({ kind: 'cube' });

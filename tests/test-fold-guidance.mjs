@@ -1,9 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
-import { buildPaperModel } from './dist/fold-models.js';
-import { stepReplayPlan, completedProjection, playbackLabel } from './dist/fold-guidance.js';
-import { paperDepthUnits, paperSortCenters, stablePaperTransparency } from './dist/fold-render.js';
+import { buildPaperModel } from '../dist/js/fold-models.js';
+import { stepReplayPlan, completedProjection, playbackLabel } from '../dist/js/fold-guidance.js';
+import { paperDepthUnits, paperSortCenters, stablePaperTransparency } from '../dist/js/fold-render.js';
 
 test('replaying one hinge preserves other joints and can repeat the same completed step', () => {
   for (const kind of ['cube', 'person', 'study-100']) {

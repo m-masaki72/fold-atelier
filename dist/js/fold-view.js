@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { OrbitControls } from './vendor/addons/controls/OrbitControls.js';
+import { OrbitControls } from '../vendor/addons/controls/OrbitControls.js';
 import { VIEW_DIRECTION } from './fold-geometry.js';
 import { buildPaperModel } from './fold-models.js';
 import { FoldPaperMesh } from './fold-paper-mesh.js';
@@ -182,10 +182,20 @@ export class FoldView {
   resize() {
     this.renderer.setSize(this.host.clientWidth, this.host.clientHeight);
     if (this.manualCamera) this.updateFrustum();
-    else this.fitFrame(true);
+    else if (this.focused) this.followStep(true);
+    else this.fitFrame(true, this.frameGoal?.direction);
+  }
+
+  cancelCameraMotion() {
+    // OrbitControls clears its pending rotation and pan when damping is disabled.
+    const damping = this.controls.enableDamping;
+    this.controls.enableDamping = false;
+    this.controls.update();
+    this.controls.enableDamping = damping;
   }
 
   home() {
+    this.cancelCameraMotion();
     this.manualCamera = false;
     this.camera.position.copy(this.controls.target).addScaledVector(VIEW_DIRECTION, 18);
     this.camera.zoom = 1;
@@ -199,6 +209,7 @@ export class FoldView {
   }
 
   top() {
+    this.cancelCameraMotion();
     this.manualCamera = true;
     this.camera.position.copy(this.controls.target).add(new THREE.Vector3(0, 18, 0.01));
     this.camera.zoom = 1;
@@ -209,6 +220,7 @@ export class FoldView {
   }
 
   setCameraMode(mode) {
+    this.cancelCameraMotion();
     this.cameraMode = mode;
     this.focused = mode === 'focus';
     this.manualCamera = false;
@@ -243,6 +255,7 @@ export class FoldView {
   }
 
   restoreCamera(saved) {
+    this.cancelCameraMotion();
     this.camera.position.fromArray(saved.position);
     this.controls.target.fromArray(saved.target);
     this.camera.zoom = saved.zoom;

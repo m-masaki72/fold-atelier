@@ -159,8 +159,7 @@
                   <img id="art-thumbnail" src="./images/fold/crane.png" alt="赤い太陽を背に飛ぶ白い鶴" />
                 </button>
                 <div>
-                  <strong id="art-title">日輪をわたる</strong
-                  ><small id="art-credit">IMAGEGEN · ORIGINAL ARTWORK</small>
+                  <strong id="art-title">日輪をわたる</strong><small id="art-credit">ORIGINAL ARTWORK</small>
                 </div>
               </div>
               <button id="art-mode" class="full" aria-pressed="false">この絵をのせる ↗</button>
@@ -251,24 +250,13 @@
       </div>
       <div id="collection-grid" class="collection-grid"></div>
     </dialog>
-    <dialog id="art-dialog">
+    <dialog id="art-dialog" aria-labelledby="art-dialog-title">
       <form method="dialog" class="dialog-heading">
-        <span class="eyebrow">A NEW PICTURE</span><button class="close" aria-label="閉じる">×</button>
+        <span class="eyebrow">YOUR PICTURE</span><button class="close" aria-label="閉じる">×</button>
       </form>
-      <h2>次は、何を折ろう。</h2>
-      <p class="dialog-lead">絵が変わると、折りかけの景色も変わる。</p>
-      <form id="generate-form">
-        <label for="art-prompt">描いてほしい景色</label
-        ><textarea
-          id="art-prompt"
-          maxlength="1200"
-          rows="3"
-          placeholder="例えば、月明かりを泳ぐ青い鯨"
-        ></textarea
-        ><button id="generate" class="primary" disabled>絵を生成して、紙にのせる <span>↗</span></button>
-        <p id="generation-status" role="status">画像生成への接続を確認しています。</p>
-      </form>
-      <div class="or"><span>または</span></div>
+      <h2 id="art-dialog-title">好きな絵を、紙にのせる。</h2>
+      <p class="dialog-lead">画像はこのブラウザ内で読み込みます。</p>
+      <p id="image-status" role="status"></p>
       <label class="upload-label" for="image-upload"
         >手元の絵をひらく <span>JPG / PNG / WebP · 10 MBまで</span></label
       ><input id="image-upload" type="file" accept="image/png,image/jpeg,image/webp" class="sr-only" /><button
@@ -278,13 +266,13 @@
         「日輪をわたる」に戻す
       </button>
     </dialog>
-    <dialog id="source-dialog">
+    <dialog id="source-dialog" aria-label="立体にのせた元の絵">
       <form method="dialog" class="dialog-heading">
         <span class="eyebrow">THE ORIGINAL</span><button class="close" aria-label="閉じる">×</button>
       </form>
       <img id="source-image" src="./images/fold/crane.png" alt="立体に配置した元の絵" />
       <p>この絵を、立体の面へつなげて配置しています。</p>
     </dialog>
-    <script type="module" src="./fold.js"></script>
+    <script type="module" src="./js/fold.js"></script>
   </body>
 </html>

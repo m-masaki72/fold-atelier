@@ -1,8 +1,8 @@
 import test, { before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
-import { FoldPaperMesh } from './dist/fold-paper-mesh.js';
-import { buildPaperModel } from './dist/fold-models.js';
+import { FoldPaperMesh } from '../dist/js/fold-paper-mesh.js';
+import { buildPaperModel } from '../dist/js/fold-models.js';
 
 const previousDocument = globalThis.document;
 before(() => {

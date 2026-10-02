@@ -1,7 +1,7 @@
 import * as THREE from 'three';
-import { LineSegments2 } from './vendor/addons/lines/LineSegments2.js';
-import { LineSegmentsGeometry } from './vendor/addons/lines/LineSegmentsGeometry.js';
-import { LineMaterial } from './vendor/addons/lines/LineMaterial.js';
+import { LineSegments2 } from '../vendor/addons/lines/LineSegments2.js';
+import { LineSegmentsGeometry } from '../vendor/addons/lines/LineSegmentsGeometry.js';
+import { LineMaterial } from '../vendor/addons/lines/LineMaterial.js';
 import { createPaperSurface, createGroundShadow } from './fold-surfaces.js';
 import { paperWallPositions } from './fold-display.js';
 import { decoratePaperMaterial, paperDepthUnits, paperSortCenters } from './fold-render.js';
