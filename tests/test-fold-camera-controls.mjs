@@ -51,8 +51,8 @@ function fixture(t, kind = 'cube') {
   view.controls.minPolarAngle = 0.015;
   view.controls.maxPolarAngle = Math.PI - 0.015;
   view.controls.addEventListener('start', () => {
-    view.manualCamera = true;
-    view.frameGoal = null;
+    view.useManualCamera();
+    view.onCameraChange?.();
   });
   view.controls.addEventListener('change', () => {
     view.needsRender = true;
@@ -129,7 +129,7 @@ test('camera buttons respect the same zoom and polar limits as pointer controls'
   assert.ok(Math.abs(polar() - view.controls.maxPolarAngle) < 1e-8);
 });
 
-test('camera adjustment clears drag inertia, pauses focus and allows focus to resume', (t) => {
+test('camera adjustment clears drag inertia, selects fixed mode and allows focus to resume', (t) => {
   const f = fixture(t);
   f.view.setCameraMode('focus');
   renderFrames(f.view);
@@ -138,7 +138,8 @@ test('camera adjustment clears drag inertia, pauses focus and allows focus to re
   f.view.adjustCamera('right');
   const adjusted = direction(f.view);
   assert.equal(f.view.manualCamera, true);
-  assert.equal(f.view.focused, true);
+  assert.equal(f.view.focused, false);
+  assert.equal(f.view.cameraMode, 'fixed');
   assert.equal(f.view.frameGoal, null);
   assert.equal(f.view.cameraSettling, false);
   renderFrames(f.view);
@@ -147,6 +148,28 @@ test('camera adjustment clears drag inertia, pauses focus and allows focus to re
   renderFrames(f.view);
   assertDirection(f.view, focusDirection, 'focus resume after button adjustment');
   assert.equal(f.view.manualCamera, false);
+});
+
+test('starting a pointer gesture switches focus to fixed without moving the camera or target', (t) => {
+  const f = fixture(t);
+  f.view.setCameraMode('focus');
+  renderFrames(f.view, 1);
+  assert.ok(f.view.frameGoal);
+  const position = f.view.camera.position.clone();
+  const target = f.view.controls.target.clone();
+  let notifications = 0;
+  f.view.onCameraChange = () => notifications++;
+  f.view.controls.dispatchEvent({ type: 'start' });
+  assert.equal(f.view.cameraMode, 'fixed');
+  assert.equal(f.view.focused, false);
+  assert.equal(f.view.manualCamera, true);
+  assert.equal(f.view.frameGoal, null);
+  assert.deepEqual(f.view.camera.position, position);
+  assert.deepEqual(f.view.controls.target, target);
+  assert.equal(notifications, 1);
+  renderFrames(f.view);
+  assert.ok(f.view.camera.position.distanceTo(position) < 1e-8);
+  assert.ok(f.view.controls.target.distanceTo(target) < 1e-8);
 });
 
 test('smooth focus resume returns to the selected crease after manual rotation', (t) => {
@@ -170,11 +193,10 @@ for (const mode of ['fixed', 'focus']) {
     const f = fixture(t);
     f.view.setCameraMode(mode);
     renderFrames(f.view);
-    const expected = mode === 'focus' ? f.view.focusCache.get(f.view.frameKey).direction : VIEW_DIRECTION;
     drag(f);
     f.view.home();
     renderFrames(f.view);
-    assertDirection(f.view, expected, `${mode} home`);
+    assertDirection(f.view, VIEW_DIRECTION, `${mode} home after switching to fixed`);
     assert.equal(f.view.manualCamera, false);
   });
 }

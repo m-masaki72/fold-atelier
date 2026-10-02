@@ -165,8 +165,8 @@
           </div>
         </section>
         <nav class="mobile-tools" aria-label="作品の道具">
-          <button data-tool="works">作品を選ぶ</button><button data-tool="paper">紙と絵</button
-          ><button data-tool="prompt">ことばで作る</button>
+          <button data-tool="works">作品を選ぶ</button>
+          <button data-tool="paper">紙の質感</button>
         </nav>
       </div>
       <div id="tools-slot" class="tools-slot">
@@ -192,7 +192,7 @@
           </section>
           <details id="tool-paper" class="tool-section tool-details">
             <summary>
-              <span>紙と絵<small id="paper-summary">和紙 · 絵なし</small></span>
+              <span>紙の質感<small id="paper-summary">和紙</small></span>
             </summary>
             <div class="tool-body">
               <fieldset class="paper-select">
@@ -202,54 +202,7 @@
                   ><label><input type="radio" name="paper" value="tracing" />透ける紙</label>
                 </div>
               </fieldset>
-              <div class="art-card">
-                <button id="source-open" class="artwork" aria-label="元の絵を見る">
-                  <img id="art-thumbnail" src="./images/fold/crane.png" alt="赤い太陽を背に飛ぶ白い鶴" />
-                </button>
-                <div>
-                  <strong id="art-title">日輪をわたる</strong><small id="art-credit">ORIGINAL ARTWORK</small>
-                </div>
-              </div>
-              <button id="art-mode" class="full" aria-pressed="false">この絵をのせる ↗</button>
-              <div class="art-actions">
-                <button id="art-open" class="text-button">絵を変える ↗</button
-                ><button id="align-view" class="text-button">
-                  完成した姿を見る <span aria-hidden="true">↗</span>
-                </button>
-              </div>
-            </div>
-          </details>
-          <details id="tool-prompt" class="tool-section tool-details">
-            <summary>
-              <span
-                >ことばで作る<small><span class="mock-badge">生成モック</span> 形・色・背丈</small></span
-              >
-            </summary>
-            <div class="tool-body">
-              <p>対応する形を、ことばで調整します。</p>
-              <form id="model-form">
-                <label for="model-prompt">つくりたい立体</label
-                ><textarea
-                  id="model-prompt"
-                  rows="3"
-                  maxlength="180"
-                  placeholder="例：赤い、背の高いロボット"
-                >
-青い服のブロックの人</textarea
-                ><button id="model-generate" class="primary full" type="submit">立体をつくる ↗</button>
-              </form>
-              <div class="prompt-examples" aria-label="プロンプトの例">
-                <button data-prompt="青い服のブロックの人">人</button
-                ><button data-prompt="赤い、背の高いロボット">ロボット</button
-                ><button data-prompt="オレンジのねこ">ねこ</button
-                ><button data-prompt="赤い屋根の小さな家">家</button
-                ><button data-prompt="青いロケット">ロケット</button
-                ><button data-prompt="紫色のお城">お城</button>
-              </div>
-              <p id="model-status" role="status">形・色・背丈を読み取り、一枚につながる展開図へ。</p>
-              <p class="mock-note">
-                用意した形を組み立てるモックです。<br />未知の立体を生成するAIではありません。
-              </p>
+              <button id="align-view" class="text-button">完成した姿を見る ↗</button>
             </div>
           </details>
           <div class="tool-foot">
@@ -262,7 +215,6 @@
     <footer class="footer">
       <div>
         <span id="save-status">このブラウザに自動保存</span>
-        <p id="image-save-status" role="status"></p>
         <button id="clear-saved-data" class="text-button" disabled>保存データを消す</button>
       </div>
       <span>完成するまでの、すべてが作品。</span>
@@ -271,7 +223,7 @@
     <dialog id="clear-data-dialog" aria-labelledby="clear-data-title">
       <h2 id="clear-data-title">このブラウザの保存データを消しますか？</h2>
       <p>
-        作品・折り具合・保存した画像・音量を消して、最初から開き直します。他のタブで開いているFOLDも閉じてください。
+        作品・折り具合・音量を消して、最初から開き直します。以前に取り込んだ画像も削除します。他のタブで開いているFOLDも閉じてください。
       </p>
       <p id="clear-data-error" role="status"></p>
       <form method="dialog"><button>キャンセル</button></form>
@@ -311,29 +263,6 @@
         ><span id="collection-results">100点</span>
       </div>
       <div id="collection-grid" class="collection-grid"></div>
-    </dialog>
-    <dialog id="art-dialog" aria-labelledby="art-dialog-title">
-      <form method="dialog" class="dialog-heading">
-        <span class="eyebrow">YOUR PICTURE</span><button class="close" aria-label="閉じる">×</button>
-      </form>
-      <h2 id="art-dialog-title">好きな絵を、紙にのせる。</h2>
-      <p class="dialog-lead">画像はこのブラウザ内で読み込みます。</p>
-      <p id="image-status" role="status"></p>
-      <label class="upload-label" for="image-upload"
-        >手元の絵をひらく <span>JPG / PNG / WebP · 10 MBまで</span></label
-      ><input id="image-upload" type="file" accept="image/png,image/jpeg,image/webp" class="sr-only" /><button
-        id="restore-art"
-        class="text-button restore"
-      >
-        「日輪をわたる」に戻す
-      </button>
-    </dialog>
-    <dialog id="source-dialog" aria-label="立体にのせた元の絵">
-      <form method="dialog" class="dialog-heading">
-        <span class="eyebrow">THE ORIGINAL</span><button class="close" aria-label="閉じる">×</button>
-      </form>
-      <img id="source-image" src="./images/fold/crane.png" alt="立体に配置した元の絵" />
-      <p>この絵を、立体の面へつなげて配置しています。</p>
     </dialog>
     <script src="./js/fold-bootstrap.js"></script>
   </body>

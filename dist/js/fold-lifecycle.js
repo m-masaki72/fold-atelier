@@ -1,6 +1,6 @@
 import { readSession, writeSession } from './fold-session.js';
 
-export function createSessionController({ snapshot, apply, restoreArtwork, reset, onSave, notify, storage }) {
+export function createSessionController({ snapshot, apply, reset, onSave, notify, storage }) {
   const saved = readSession(storage);
   let lastSaved = '';
 
@@ -14,16 +14,11 @@ export function createSessionController({ snapshot, apply, restoreArtwork, reset
       onSave(success);
       if (success) lastSaved = serialized;
     },
-    async restore() {
+    restore() {
       if (!saved) return;
       try {
-        const restored = await restoreArtwork(saved.imageKey);
         apply(saved);
-        notify(
-          saved.imageKey && restored === false
-            ? '前回の作品を再開しました。保存した画像は見つかりませんでした。「絵を変える」から選び直せます。'
-            : '前回の作品と折り具合を再開しました。',
-        );
+        notify('前回の作品と折り具合を再開しました。');
       } catch {
         reset();
         notify('前回の状態を読み込めなかったため、最初の作品を開きました。');

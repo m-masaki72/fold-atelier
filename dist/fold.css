@@ -121,14 +121,6 @@ textarea {
 [hidden] {
   display: none !important;
 }
-.sr-only {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  clip-path: inset(50%);
-  overflow: hidden;
-  white-space: nowrap;
-}
 .text-button {
   border-color: transparent;
   background: transparent;
@@ -623,67 +615,6 @@ input[type='range'] {
 input[type='radio'] {
   accent-color: var(--ink);
 }
-.art-card {
-  display: flex;
-  gap: 12px;
-  align-items: center;
-  margin: 18px 0 12px;
-}
-.artwork {
-  width: 78px;
-  height: 78px;
-  flex-shrink: 0;
-  padding: 0;
-  overflow: hidden;
-}
-.artwork img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  display: block;
-}
-#art-title {
-  font-size: 14px;
-}
-#art-credit {
-  display: block;
-  font-size: 10px;
-  color: var(--muted);
-  margin-top: 4px;
-}
-.art-actions {
-  display: flex;
-  flex-wrap: wrap;
-  margin-top: 4px;
-}
-.art-actions button {
-  font-size: 12px;
-  padding: 7px 4px;
-}
-.mock-badge {
-  color: var(--accent);
-  background: #f2e8df;
-  padding: 2px 6px;
-  border-radius: 3px;
-}
-#model-generate {
-  margin-top: 8px;
-}
-.prompt-examples {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 6px;
-  margin: 12px 0;
-}
-.prompt-examples button {
-  font-size: 13px;
-  padding: 8px 4px;
-}
-.tool-body p.mock-note {
-  font-size: 12px;
-  padding-top: 10px;
-  border-top: 1px solid var(--line);
-}
 .tool-foot {
   border-left: 2px solid #bbc3b0;
   padding-left: 14px;
@@ -817,43 +748,6 @@ dialog h2 {
 }
 .study-card[aria-pressed='true'] span {
   color: #dce3d5;
-}
-#image-status {
-  min-height: 1.5em;
-  margin: 14px 0;
-  color: var(--accent);
-  font-size: 13px;
-}
-.upload-label {
-  display: block;
-  text-align: center;
-  border: 1px dashed #929d89;
-  padding: 18px;
-  border-radius: 8px;
-  cursor: pointer;
-}
-.upload-label span {
-  display: block;
-  font-size: 12px;
-  color: var(--muted);
-}
-.upload-label:has(+ input:focus-visible) {
-  outline: 3px solid var(--accent);
-}
-.restore {
-  display: block;
-  margin: 12px auto 0;
-  font-size: 13px;
-}
-#source-image {
-  width: 100%;
-  display: block;
-  border-radius: 8px;
-}
-#source-dialog p {
-  font-size: 13px;
-  color: var(--muted);
-  margin-top: 12px;
 }
 #tools-dialog .tools-content {
   border: 0;
@@ -1040,7 +934,7 @@ dialog h2 {
   }
   .mobile-tools {
     display: grid;
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(2, 1fr);
     gap: 8px;
     margin-top: 12px;
   }

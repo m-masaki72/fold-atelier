@@ -1,11 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { readFile } from 'node:fs/promises';
 
-const pixel = Buffer.from(
-  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=',
-  'base64',
-);
-
 async function openApp(page) {
   await page.goto('/');
   await expect(page).toHaveURL(/\/dist\/fold\.html$/);
@@ -51,22 +46,26 @@ test('site metadata, favicon, share image and sitemap point to the published app
   expect(locations).toEqual([canonical]);
 });
 
-test('an unavailable default image does not prevent folding or choosing a replacement', async ({ page }) => {
-  await page.route('**/images/fold/crane.png', (route) => route.abort());
+test('startup needs no artwork or collection image downloads', async ({ page }) => {
+  const images = [];
+  page.on('request', (request) => {
+    if (request.url().includes('/images/fold/')) images.push(request.url());
+  });
+  await page.addInitScript(() => {
+    indexedDB.open = () => {
+      throw new Error('Unused image storage');
+    };
+  });
   await openApp(page);
-  await expect(page.locator('#toast')).toContainText('元の絵を読み込めませんでした');
+  expect(images).toEqual([]);
+  await expect(page.locator('input[type="file"]')).toHaveCount(0);
+  await expect(page.getByText('絵を変える')).toHaveCount(0);
+  await expect(page.getByText('ことばで作る')).toHaveCount(0);
+  await expect(page.locator('textarea')).toHaveCount(0);
   await expect.poll(() => page.evaluate(() => window.__FOLD__.snapshot().drawCalls)).toBeGreaterThan(0);
-  await page.locator('#model-select').selectOption('cube');
-  await expect(page.locator('#model-title')).toHaveText('立方体');
-  await page.locator('#tool-paper summary').click();
-  await expect(page.locator('#art-mode')).toBeDisabled();
-  await page.locator('#art-open').click();
-  await page
-    .locator('#image-upload')
-    .setInputFiles({ name: 'picture.png', mimeType: 'image/png', buffer: pixel });
-  await expect(page.locator('#art-dialog')).not.toBeVisible();
-  await expect(page.locator('#art-mode')).toBeEnabled();
-  await expect.poll(() => page.evaluate(() => window.__FOLD__.snapshot().artMode)).toBe(true);
+  await page.locator('#collection-open').click();
+  await expect.poll(() => images.length).toBeGreaterThan(0);
+  await expect(page.locator('#collection-grid img').first()).toHaveJSProperty('complete', true);
 });
 
 test('holding Space toggles playback once and browser shortcuts are left alone', async ({ page }) => {
@@ -153,29 +152,22 @@ for (const failure of ['exception', 'empty result', 'missing 2D context']) {
   });
 }
 
-test('an uploaded image, folding state and camera survive reload', async ({ page }) => {
+test('folding paper and camera settings survive reload', async ({ page }) => {
   await openApp(page);
   await page.locator('#model-select').selectOption('cat');
   await page.locator('#tool-paper summary').click();
-  await page.locator('#art-open').click();
-  await page
-    .locator('#image-upload')
-    .setInputFiles({ name: 'saved.png', mimeType: 'image/png', buffer: pixel });
-  await expect(page.locator('#art-dialog')).not.toBeVisible();
-  await expect.poll(() => page.evaluate(() => window.__FOLD__.snapshot().imageKey)).toBeTruthy();
+  await page.locator('input[value="tracing"]').check();
   await page.locator('#focus-step').click();
   await page.evaluate(() => window.__FOLD__.setFold(0.5));
-  await page.route('**/images/fold/crane.png', (route) => route.abort());
   await page.reload();
-  await expect(page.locator('#loading')).toBeHidden();
   await expect.poll(() => page.evaluate(() => window.__FOLD__?.snapshot().ready)).toBe(true);
   const state = await page.evaluate(() => window.__FOLD__.snapshot());
   expect(state.model).toBe('cat');
   expect(state.fold).toBe(0.5);
   expect(state.playing).toBe(false);
-  expect(state.artMode).toBe(true);
+  expect(state.paper).toBe('tracing');
   expect(state.cameraMode).toBe('focus');
-  await expect(page.locator('#art-title')).toHaveText('saved');
+  await expect(page.locator('#paper-summary')).toHaveText('透ける紙');
 });
 
 test('an older audio start failure cannot turn off a newer successful start', async ({ page }) => {
@@ -212,17 +204,17 @@ test('an older audio start failure cannot turn off a newer successful start', as
   expect(errors).toEqual([]);
 });
 
-test('mobile tools return their content and focus correctly after a width change', async ({ page }) => {
+test('mobile paper tools return their content after a width change', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await openApp(page);
-  await page.getByRole('button', { name: '紙と絵', exact: true }).click();
-  await page.locator('#art-open').click();
+  await page.getByRole('button', { name: '紙の質感', exact: true }).click();
+  await page.locator('input[value="tracing"]').check();
   await page.setViewportSize({ width: 1280, height: 900 });
-  await page.locator('#art-dialog').getByRole('button', { name: '閉じる', exact: true }).click();
   await expect(page.locator('#tools-dialog')).not.toBeVisible();
   await expect(page.locator('#tools-slot #tools-content')).toBeVisible();
-  await expect(page.locator('#art-open')).toBeFocused();
-  await page.screenshot({ path: test.info().outputPath('tools-restored.png'), fullPage: true });
+  await expect(page.locator('input[value="tracing"]')).toBeChecked();
+  await page.screenshot({ path: test.info().outputPath('paper-tools.png'), fullPage: true });
+  await page.screenshot({ path: test.info().outputPath('paper-tools.jpg'), fullPage: true, quality: 85 });
 });
 
 for (const failure of ['module', 'webgl']) {
@@ -244,29 +236,6 @@ for (const failure of ['module', 'webgl']) {
   });
 }
 
-async function uploadPicture(page, name) {
-  await page.locator('#tool-paper summary').click();
-  await page.locator('#art-open').click();
-  await page
-    .locator('#image-upload')
-    .setInputFiles({ name: `${name}.png`, mimeType: 'image/png', buffer: pixel });
-  await expect(page.locator('#art-dialog')).not.toBeVisible();
-}
-
-test('image persistence failure stays visible after upload success', async ({ page }) => {
-  await page.addInitScript(() => {
-    indexedDB.open = () => {
-      throw new DOMException('Storage denied', 'SecurityError');
-    };
-  });
-  await openApp(page);
-  await uploadPicture(page, 'temporary');
-  await expect(page.locator('#image-save-status')).toBeVisible();
-  await expect(page.locator('#image-save-status')).toContainText('次回は画像を選び直して');
-  await expect(page.locator('#art-title')).toHaveText('temporary');
-  expect(await page.evaluate(() => window.__FOLD__.snapshot().imageKey)).toBeNull();
-});
-
 test('keyboard camera buttons rotate and zoom without changing the fold', async ({ page }) => {
   await openApp(page);
   await page.evaluate(() => window.__FOLD__.setFold(0.5));
@@ -277,7 +246,9 @@ test('keyboard camera buttons rotate and zoom without changing the fold', async 
   const rotated = await page.evaluate(() => window.__FOLD__.snapshot());
   expect(rotated.camera).not.toEqual(before.camera);
   expect(rotated.fold).toBe(0.5);
-  await expect(page.locator('#camera-resume')).toBeVisible();
+  expect(rotated.cameraMode).toBe('fixed');
+  await expect(page.locator('#camera-fixed')).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.locator('#focus-step')).toHaveAttribute('aria-pressed', 'false');
   const previousZoom = await page.evaluate(
     () => JSON.parse(localStorage.getItem('fold-atelier-session-v1')).camera.zoom,
   );
@@ -288,72 +259,44 @@ test('keyboard camera buttons rotate and zoom without changing the fold', async 
   ).toBeGreaterThan(previousZoom);
 });
 
-test('different tabs keep each uploaded image available for resuming', async ({ page, context }) => {
+test('clearing saved settings starts again with defaults', async ({ page }) => {
   await openApp(page);
-  await uploadPicture(page, 'first');
-  await expect.poll(() => page.evaluate(() => window.__FOLD__.snapshot().imageKey)).toBeTruthy();
-  const firstKey = await page.evaluate(() => window.__FOLD__.snapshot().imageKey);
-  const other = await context.newPage();
-  await openApp(other);
-  await uploadPicture(other, 'second');
-  await expect.poll(() => other.evaluate(() => window.__FOLD__.snapshot().imageKey)).toBeTruthy();
-  expect(await other.evaluate(() => window.__FOLD__.snapshot().imageKey)).not.toBe(firstKey);
-  await other.close();
-  await page.evaluate(() => window.__FOLD__.setFold(0.4));
-  await expect
-    .poll(() => page.evaluate(() => JSON.parse(localStorage.getItem('fold-atelier-session-v1')).fold))
-    .toBe(0.4);
-  await page.reload();
-  await expect.poll(() => page.evaluate(() => window.__FOLD__?.snapshot().ready)).toBe(true);
-  await expect(page.locator('#art-title')).toHaveText('first');
-  expect(await page.evaluate(() => window.__FOLD__.snapshot().imageKey)).toBe(firstKey);
-});
-
-test('clearing saved data removes pictures settings and resumes from defaults', async ({ page }) => {
-  await openApp(page);
-  await uploadPicture(page, 'forget-me');
-  await expect.poll(() => page.evaluate(() => window.__FOLD__.snapshot().imageKey)).toBeTruthy();
-  const savedKey = await page.evaluate(() => window.__FOLD__.snapshot().imageKey);
+  await page.locator('#model-select').selectOption('cat');
+  await page.evaluate(() => window.__FOLD__.setFold(0.5));
   await page.locator('#bgm-volume').evaluate((node) => {
     node.value = '80';
     node.dispatchEvent(new Event('input'));
   });
   await page.locator('#clear-saved-data').click();
   await page.locator('#clear-data-dialog').getByRole('button', { name: 'キャンセル' }).click();
-  await expect(page.locator('#art-title')).toHaveText('forget-me');
+  await expect(page.locator('#model-title')).toHaveText('ねこ');
   await page.locator('#clear-saved-data').click();
   await Promise.all([page.waitForEvent('load'), page.locator('#confirm-clear-data').click()]);
   await expect.poll(() => page.evaluate(() => window.__FOLD__?.snapshot().ready)).toBe(true);
-  await expect(page.locator('#art-title')).toHaveText('日輪をわたる');
-  expect(await page.evaluate(() => window.__FOLD__.snapshot().imageKey)).toBeNull();
+  expect(await page.evaluate(() => window.__FOLD__.snapshot().model)).toBe('person');
   expect(await page.evaluate(() => window.__FOLD__.snapshot().audio.volumes.bgm)).toBe(0.32);
-  const images = await page.evaluate(async (key) => {
-    const { imageStore } = await import('./js/fold-session.js');
-    return imageStore(undefined, key);
-  }, savedKey);
-  expect(images).toBeUndefined();
 });
 
-test('clearing in another tab stops stale automatic saves', async ({ page, context }) => {
+test('clearing in another tab closes tools and stops stale automatic saves', async ({ page, context }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
   await openApp(page);
-  await uploadPicture(page, 'old-picture');
-  await expect.poll(() => page.evaluate(() => window.__FOLD__.snapshot().imageKey)).toBeTruthy();
   const other = await context.newPage();
   await openApp(other);
   await page.locator('#sound-toggle').click();
-  await page.locator('#art-open').click();
+  await page.getByRole('button', { name: '紙の質感', exact: true }).click();
   await other.locator('#clear-saved-data').click();
   await Promise.all([other.waitForEvent('load'), other.locator('#confirm-clear-data').click()]);
   await expect(page.locator('#storage-reset')).toBeVisible();
-  await expect(page.locator('#art-dialog')).not.toBeVisible();
-  await expect(page.getByRole('link', { name: '最初から開き直す' })).toBeVisible();
-  await expect.poll(() => page.evaluate(() => window.__FOLD__.snapshot().audio.voices)).toBe(0);
+  await expect(page.locator('#tools-dialog')).not.toBeVisible();
   expect(await page.locator('.workspace').evaluate((node) => node.inert)).toBe(true);
+  await page.evaluate(
+    () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))),
+  );
+  expect(await page.evaluate(() => window.__FOLD__.snapshot().audio.voices)).toBe(0);
   await page.close();
   await other.reload();
   await expect.poll(() => other.evaluate(() => window.__FOLD__?.snapshot().ready)).toBe(true);
-  await expect(other.locator('#art-title')).toHaveText('日輪をわたる');
-  expect(await other.evaluate(() => window.__FOLD__.snapshot().imageKey)).toBeNull();
+  expect(await other.evaluate(() => window.__FOLD__.snapshot().model)).toBe('person');
 });
 
 test('reduced motion and narrow screens remain usable', async ({ page }) => {
@@ -362,4 +305,85 @@ test('reduced motion and narrow screens remain usable', async ({ page }) => {
   await openApp(page);
   expect(await page.evaluate(() => window.__FOLD__.snapshot().playing)).toBe(false);
   expect(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)).toBe(false);
+});
+
+test('old picture settings are ignored and explicit clearing removes legacy pictures', async ({ page }) => {
+  await page.goto('/404.html');
+  await page.evaluate(async () => {
+    localStorage.setItem(
+      'fold-atelier-session-v1',
+      JSON.stringify({
+        version: 1,
+        spec: { kind: 'cat' },
+        fold: 0.5,
+        playing: false,
+        artMode: true,
+        imageKey: 'legacy',
+      }),
+    );
+    const db = await new Promise((resolve, reject) => {
+      const request = indexedDB.open('fold-atelier-images', 1);
+      request.onupgradeneeded = () => request.result.createObjectStore('images');
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+    await new Promise((resolve, reject) => {
+      const transaction = db.transaction('images', 'readwrite');
+      transaction
+        .objectStore('images')
+        .put({ key: 'legacy', blob: new Blob(['old private image']) }, 'current');
+      transaction.oncomplete = resolve;
+      transaction.onerror = () => reject(transaction.error);
+    });
+    db.close();
+  });
+  await page.addInitScript(() => {
+    const open = indexedDB.open.bind(indexedDB);
+    window.imageDatabaseOpens = 0;
+    indexedDB.open = (...args) => {
+      window.imageDatabaseOpens++;
+      return open(...args);
+    };
+  });
+  await openApp(page);
+  const state = await page.evaluate(() => window.__FOLD__.snapshot());
+  expect(state.model).toBe('cat');
+  expect(state.fold).toBe(0.5);
+  expect(state).not.toHaveProperty('imageKey');
+  expect(await page.evaluate(() => window.imageDatabaseOpens)).toBe(0);
+  await page.locator('#clear-saved-data').click();
+  await Promise.all([page.waitForEvent('load'), page.locator('#confirm-clear-data').click()]);
+  await expect.poll(() => page.evaluate(() => window.__FOLD__?.snapshot().ready)).toBe(true);
+  const count = await page.evaluate(async () => {
+    const db = await new Promise((resolve) => {
+      const request = indexedDB.open('fold-atelier-images');
+      request.onsuccess = () => resolve(request.result);
+    });
+    try {
+      return await new Promise((resolve) => {
+        const request = db.transaction('images').objectStore('images').count();
+        request.onsuccess = () => resolve(request.result);
+      });
+    } finally {
+      db.close();
+    }
+  });
+  expect(count).toBe(0);
+});
+
+test('dragging in focus mode returns the camera toggle to fixed', async ({ page }) => {
+  await openApp(page);
+  await page.evaluate(() => window.__FOLD__.setFold(0.5));
+  await page.locator('#focus-step').click();
+  await expect(page.locator('#focus-step')).toHaveAttribute('aria-pressed', 'true');
+  const area = await page.locator('#fold-viewport').boundingBox();
+  await page.mouse.move(area.x + area.width / 2, area.y + area.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(area.x + area.width / 2 + 45, area.y + area.height / 2 + 15, { steps: 3 });
+  await page.mouse.up();
+  await expect(page.locator('#camera-fixed')).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.locator('#focus-step')).toHaveAttribute('aria-pressed', 'false');
+  expect(await page.evaluate(() => window.__FOLD__.snapshot().cameraMode)).toBe('fixed');
+  await page.locator('#focus-step').click();
+  await expect(page.locator('#focus-step')).toHaveAttribute('aria-pressed', 'true');
 });

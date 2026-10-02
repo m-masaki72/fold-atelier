@@ -1,10 +1,9 @@
 import { FoldView } from './fold-view.js';
 import { COLLECTION } from './fold-net-data.js';
 import { createGallery } from './fold-gallery.js';
-import { createArtwork } from './fold-artwork.js';
 import { advancePlayback, END_HOLD_SECONDS, STEP_SECONDS } from './fold-sequence.js';
 import { FoldAudio, audibleFold } from './fold-audio.js';
-import { imageStore, clearSavedData, SESSION_KEY } from './fold-session.js';
+import { clearSavedData, SESSION_KEY } from './fold-session.js';
 import { createSessionController, startApp } from './fold-lifecycle.js';
 import { CompletedPreview, stepReplayPlan, playbackLabel } from './fold-guidance.js';
 
@@ -19,19 +18,12 @@ const state = {
   fold: reducedMotion ? 1 : 0,
   playing: false,
   paper: 'washi',
-  artwork: '日輪をわたる',
-  imageSource: './images/fold/crane.png',
-  imageReady: false,
   model: 'person',
-  modelGenerating: false,
-  artMode: false,
   touring: false,
-  imageKey: null,
 };
 let view,
   animation = null,
   previousTime = 0;
-let artwork;
 let saveBlocked = false;
 const gallery = createGallery({
   state,
@@ -40,19 +32,12 @@ const gallery = createGallery({
   setPlaying,
   closeTools,
   toast,
-  reducedMotion,
 });
 let playback = { progress: state.fold, direction: 1, hold: 1.1 };
 let tourElapsed = 0;
 const session = createSessionController({
   snapshot: snapshotSession,
   apply: applySession,
-  restoreArtwork: async (key) => {
-    if (!key) return;
-    const image = await imageStore(undefined, key).catch(() => null);
-    if (image?.key !== key) return false;
-    return artwork.restore(image);
-  },
   reset: () => setModel({ kind: 'person' }),
   onSave: (success) => {
     $('#save-status').textContent = success ? 'このブラウザに自動保存済み' : 'このブラウザでは保存できません';
@@ -109,8 +94,7 @@ function openTools(name) {
   });
   $('#tools-title').textContent = {
     works: '作品を選ぶ',
-    paper: '紙と絵',
-    prompt: 'ことばで作る',
+    paper: '紙の質感',
   }[name];
   $('#tools-body').append(content);
   $('#tools-dialog').showModal();
@@ -126,9 +110,6 @@ function snapshotSession() {
     paper: state.paper,
     cameraMode: view.cameraMode,
     camera: view.cameraState(),
-    prompt: $('#model-prompt').value,
-    artMode: state.artMode,
-    imageKey: state.imageKey,
     family: $('#collection-family').value,
     ...gallery.snapshot(),
   };
@@ -136,13 +117,12 @@ function snapshotSession() {
 
 function applySession(saved) {
   setModel(saved.spec, false);
-  $('#model-prompt').value = saved.prompt;
   $('#collection-family').value = saved.family;
   $('#collection-family').dispatchEvent(new Event('change'));
   state.paper = saved.paper;
   view.setPaper(state.paper);
   $(`input[name="paper"][value="${state.paper}"]`).checked = true;
-  setArtMode(saved.artMode && (!saved.imageKey || !!state.imageKey));
+  $('#paper-summary').textContent = state.paper === 'washi' ? '和紙' : '透ける紙';
   setFold(saved.fold);
   view.setCameraMode(saved.cameraMode);
   if (saved.camera?.manual) view.restoreCamera(saved.camera);
@@ -251,18 +231,6 @@ function stepFold(direction) {
   goTo(view.model.sequence.target(state.fold, direction), 850);
 }
 
-function setArtMode(enabled) {
-  enabled = enabled && state.imageReady;
-  state.artMode = enabled;
-  view.setArtMode(enabled);
-  $('#art-mode').disabled = !state.imageReady;
-  $('#art-mode').setAttribute('aria-pressed', String(enabled));
-  $('#art-mode').textContent = enabled ? '元の色にもどす ↗' : 'この絵をのせる ↗';
-  $('#align-view').firstChild.textContent = enabled ? '絵がつながる視点 ' : '完成した姿を見る ';
-  $('#paper-summary').textContent =
-    `${state.paper === 'washi' ? '和紙' : '透ける紙'} · ${enabled ? '絵あり' : '絵なし'}`;
-}
-
 function setModel(spec, animate = true) {
   setPlaying(false);
   view.setModel(spec);
@@ -271,19 +239,10 @@ function setModel(spec, animate = true) {
   state.model = spec.kind;
   gallery.reflectModel(spec.kind);
   $('#model-select').value = spec.kind;
-  setArtMode(false);
   setFold(animate && !reducedMotion ? 0 : 1);
   view.home();
   playback = { progress: state.fold, direction: 1, hold: 1.1 };
   setPlaying(animate && !reducedMotion);
-  const variation = [
-    view.model.label,
-    spec.colorName,
-    spec.stature > 1 ? 'のっぽ' : spec.stature < 1 ? '小柄' : null,
-  ]
-    .filter(Boolean)
-    .join(' / ');
-  $('#model-status').textContent = `${variation}。${view.model.faces.length}面が一枚につながる展開図です。`;
 }
 
 function frame(now) {
@@ -324,13 +283,7 @@ async function initializeView() {
   view = new FoldView($('#fold-viewport'));
   preview.setModel(view.model);
   view.onCameraChange = updateFocusControl;
-  try {
-    state.imageReady = await view.setImage(state.imageSource);
-  } catch {
-    toast('元の絵を読み込めませんでした。紙の立体はそのまま遊べます。「絵を変える」から別の画像を選べます。');
-  }
   setFold(state.fold);
-  setArtMode(false);
   setPlaying(!reducedMotion);
 }
 
@@ -348,17 +301,7 @@ function bindControls() {
     ['#step-next', 1],
   ])
     $(selector).addEventListener('click', () => stepFold(direction));
-  artwork = createArtwork({
-    view,
-    state,
-    setArtMode,
-    goTo,
-    closeTools,
-    toast,
-    saveSession,
-  });
   gallery.init();
-  $('#art-mode').addEventListener('click', () => setArtMode(!state.artMode));
   document.querySelectorAll('[data-fold]').forEach((button) =>
     button.addEventListener('click', () => {
       setTouring(false);
@@ -373,7 +316,7 @@ function bindControls() {
     input.addEventListener('change', () => {
       state.paper = input.value;
       view.setPaper(input.value);
-      setArtMode(state.artMode);
+      $('#paper-summary').textContent = state.paper === 'washi' ? '和紙' : '透ける紙';
     }),
   );
   $('#align-view').addEventListener('click', () => {
@@ -418,7 +361,6 @@ function bindControls() {
     $('#confirm-clear-data').disabled = true;
     $('#clear-data-dialog form button').disabled = true;
     try {
-      await artwork.forget();
       await clearSavedData();
       location.reload();
     } catch {
@@ -490,7 +432,6 @@ function bindControls() {
     setPlaying(false);
     sound.setVisible(false);
     document.querySelectorAll('dialog[open]').forEach((dialog) => dialog.close());
-    artwork.forget().catch(() => {});
     $('.workspace').inert = true;
     $('.header-tools').inert = true;
     $('#clear-saved-data').disabled = true;
@@ -514,7 +455,6 @@ function bindControls() {
       toast('画像を保存できませんでした。');
     }
   });
-  artwork.init();
 }
 
 function activate() {
@@ -526,7 +466,6 @@ function activate() {
   window.__FOLD__ = {
     snapshot: () => ({
       ...state,
-      imageSource: state.imageSource.startsWith('blob:') ? 'local-image' : state.imageSource,
       animating: !!animation,
       camera: view.camera.position.toArray(),
       target: view.controls.target.toArray(),
@@ -561,7 +500,6 @@ function activate() {
       setFold(value);
     },
     vertices: () => view.model.vertices(state.fold).map((face) => face.map((p) => p.toArray())),
-    uvs: () => view.model.uvs,
   };
 }
 

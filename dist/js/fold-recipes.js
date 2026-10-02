@@ -1,54 +1,17 @@
 import { createStudy } from './fold-collection.js';
 
 export const MODEL_PRESETS = [
-  { id: 'person', label: 'ブロックの人', prompt: '青い服のブロックの人' },
-  { id: 'robot', label: 'ロボット', prompt: '赤いロボット' },
-  { id: 'cat', label: 'ねこ', prompt: 'オレンジのねこ' },
-  { id: 'house', label: '小さな家', prompt: '赤い屋根の小さな家' },
-  { id: 'rocket', label: 'ロケット', prompt: '青いロケット' },
-  { id: 'castle', label: 'お城', prompt: '紫色のお城' },
-  { id: 'cube', label: '立方体', prompt: '立方体' },
-  { id: 'tetrahedron', label: '四面体', prompt: '四面体' },
-  { id: 'octahedron', label: '八面体', prompt: '八面体' },
-  { id: 'dodecahedron', label: '十二面体', prompt: '十二面体' },
+  { id: 'person', label: 'ブロックの人' },
+  { id: 'robot', label: 'ロボット' },
+  { id: 'cat', label: 'ねこ' },
+  { id: 'house', label: '小さな家' },
+  { id: 'rocket', label: 'ロケット' },
+  { id: 'castle', label: 'お城' },
+  { id: 'cube', label: '立方体' },
+  { id: 'tetrahedron', label: '四面体' },
+  { id: 'octahedron', label: '八面体' },
+  { id: 'dodecahedron', label: '十二面体' },
 ];
-
-const COLORS = [
-  [/赤|レッド/, '#b8503e', '赤'],
-  [/青|ブルー/, '#4c819b', '青'],
-  [/緑|グリーン/, '#658772', '緑'],
-  [/黄|イエロー/, '#d7ae49', '黄'],
-  [/紫|パープル/, '#8a709e', '紫'],
-  [/ピンク|桃色/, '#cf8c9c', 'ピンク'],
-  [/オレンジ|橙|茶色/, '#be8754', 'オレンジ'],
-  [/白|ホワイト/, '#e1dfd2', '白'],
-  [/黒|ブラック/, '#4c5158', '黒'],
-];
-
-export function parseModelPrompt(prompt) {
-  const text = prompt.trim().toLowerCase();
-  const patterns = [
-    ['dodecahedron', /十二面|12面/],
-    ['octahedron', /八面|8面|ダイヤ|宝石/],
-    ['tetrahedron', /四面|4面|三角錐|ピラミッド/],
-    ['cube', /立方体|六面|6面|キューブ/],
-    ['robot', /ロボット|ロボ|robot/],
-    ['cat', /ねこ|ネコ|猫|cat/],
-    ['castle', /城|castle/],
-    ['house', /家|ハウス|おうち|house/],
-    ['rocket', /ロケット|宇宙船|rocket/],
-    ['person', /人|マイクラ|minecraft|キャラ|ヒーロー|person/],
-  ];
-  const kind = patterns.find(([, regex]) => regex.test(text))?.[0];
-  if (!kind) return null;
-  const color = COLORS.find(([regex]) => regex.test(text));
-  const stature = /のっぽ|背[がの]高|長身|細長/.test(text)
-    ? 1.3
-    : /小柄|背[がの]低|ずんぐり|ちび/.test(text)
-      ? 0.78
-      : 1;
-  return { kind, color: color?.[1], colorName: color?.[2], stature };
-}
 
 function box(name, size, position, color, pattern) {
   const vertices = [];

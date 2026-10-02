@@ -12,7 +12,6 @@ export class FoldView {
     this.host = host;
     this.fold = 1;
     this.paper = 'washi';
-    this.artMode = false;
     this.needsRender = true;
     this.renderCount = 0;
     this.frameHalf = 3;
@@ -52,8 +51,7 @@ export class FoldView {
     this.resizeObserver = new ResizeObserver(() => this.resize());
     this.resizeObserver.observe(host);
     this.controls.addEventListener('start', () => {
-      this.manualCamera = true;
-      this.frameGoal = null;
+      this.useManualCamera();
       this.onCameraChange?.();
     });
     this.controls.addEventListener('change', () => {
@@ -75,20 +73,6 @@ export class FoldView {
     this.frameReady = false;
     this.setPaper(this.paper);
     this.setFold(this.fold);
-  }
-
-  async setImage(source, isCurrent = () => true) {
-    const ticket = (this.imageTicket = (this.imageTicket || 0) + 1);
-    const texture = await new THREE.TextureLoader().loadAsync(source);
-    if (ticket !== this.imageTicket || !isCurrent()) {
-      texture.dispose();
-      return false;
-    }
-    texture.colorSpace = THREE.SRGBColorSpace;
-    texture.anisotropy = Math.min(8, this.renderer.capabilities.getMaxAnisotropy());
-    this.paperMesh.setImage(texture);
-    this.needsRender = true;
-    return true;
   }
 
   setFold(value) {
@@ -129,12 +113,6 @@ export class FoldView {
     if (this.reviewStep === index) return;
     this.reviewStep = index;
     this.setFold(this.fold);
-  }
-
-  setArtMode(enabled) {
-    this.artMode = enabled;
-    this.paperMesh.setArtMode(enabled);
-    this.needsRender = true;
   }
 
   setPaper(kind) {
@@ -194,6 +172,13 @@ export class FoldView {
     this.controls.enableDamping = damping;
   }
 
+  useManualCamera() {
+    this.manualCamera = true;
+    this.cameraMode = 'fixed';
+    this.focused = false;
+    this.frameGoal = null;
+  }
+
   home() {
     this.cancelCameraMotion();
     this.manualCamera = false;
@@ -222,8 +207,7 @@ export class FoldView {
   adjustCamera(action) {
     if (!['left', 'right', 'up', 'down', 'zoom-in', 'zoom-out'].includes(action)) return;
     this.cancelCameraMotion();
-    this.manualCamera = true;
-    this.frameGoal = null;
+    this.useManualCamera();
     if (action.startsWith('zoom-')) {
       this.camera.zoom = THREE.MathUtils.clamp(
         this.camera.zoom * (action === 'zoom-in' ? 1.2 : 1 / 1.2),
@@ -348,7 +332,6 @@ export class FoldView {
   }
 
   dispose() {
-    this.imageTicket = (this.imageTicket || 0) + 1;
     this.resizeObserver.disconnect();
     this.controls.dispose();
     this.paperMesh.dispose();

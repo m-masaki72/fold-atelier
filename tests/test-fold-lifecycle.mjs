@@ -10,18 +10,14 @@ function deferred() {
   return { promise, resolve };
 }
 
-test('delayed image restoration finishes before state is applied or controls become interactive', async () => {
-  const image = deferred();
-  const saved = { version: 1, spec: { kind: 'robot' }, fold: 0.73, imageKey: 'picture', cameraMode: 'focus' };
+test('initialization finishes before state is applied or controls become interactive', async () => {
+  const initialized = deferred();
+  const saved = { version: 1, spec: { kind: 'robot' }, fold: 0.73, cameraMode: 'focus' };
   let interactive = true;
   let applied;
   let active = false;
   const session = createSessionController({
     storage: { getItem: () => JSON.stringify(saved) },
-    restoreArtwork: (key) => {
-      assert.equal(key, 'picture');
-      return image.promise;
-    },
     apply: (value) => {
       applied = value;
     },
@@ -34,7 +30,7 @@ test('delayed image restoration finishes before state is applied or controls bec
     setInteractive: (value) => {
       interactive = value;
     },
-    initialize() {},
+    initialize: () => initialized.promise,
     restore: session.restore,
     activate: () => {
       active = true;
@@ -45,7 +41,7 @@ test('delayed image restoration finishes before state is applied or controls bec
   assert.equal(interactive, false);
   assert.equal(active, false);
   assert.equal(applied, undefined);
-  image.resolve();
+  initialized.resolve();
   await starting;
   assert.equal(applied.spec.kind, 'robot');
   assert.equal(applied.fold, 0.73);
@@ -58,11 +54,8 @@ test('a failed restore resets the work and allows startup to finish', async () =
   let resets = 0;
   const session = createSessionController({
     storage: { getItem: () => JSON.stringify({ version: 1, spec: { kind: 'cat' } }) },
-    restoreArtwork: async () => {
-      throw new Error('Image decode failed');
-    },
     apply() {
-      assert.fail('Failed restore must not apply camera and playback state');
+      throw new Error('Saved model could not be built');
     },
     reset: () => {
       resets++;
@@ -73,27 +66,39 @@ test('a failed restore resets the work and allows startup to finish', async () =
   assert.equal(resets, 1);
 });
 
-test('a missing saved image warns the user while restoring the work and folding state', async () => {
+test('old picture and prompt settings are discarded while restoring the work and folding state', () => {
   let applied, notification;
   const session = createSessionController({
     storage: {
-      getItem: () => JSON.stringify({ version: 1, spec: { kind: 'cat' }, fold: 0.4, imageKey: 'missing' }),
+      getItem: () =>
+        JSON.stringify({
+          version: 1,
+          spec: { kind: 'cat' },
+          fold: 0.4,
+          cameraMode: 'focus',
+          imageKey: 'old-picture',
+          artMode: true,
+          prompt: '赤いロボット',
+        }),
     },
-    restoreArtwork: async () => false,
     apply: (value) => {
       applied = value;
     },
     reset() {
-      assert.fail('A missing image must not discard the saved model');
+      assert.fail('Old picture settings must not discard the saved model');
     },
     notify: (value) => {
       notification = value;
     },
   });
-  await session.restore();
+  session.restore();
   assert.equal(applied.spec.kind, 'cat');
   assert.equal(applied.fold, 0.4);
-  assert.match(notification, /保存した画像は見つかりません/);
+  assert.equal(applied.cameraMode, 'focus');
+  assert.equal(Object.hasOwn(applied, 'imageKey'), false);
+  assert.equal(Object.hasOwn(applied, 'artMode'), false);
+  assert.equal(Object.hasOwn(applied, 'prompt'), false);
+  assert.equal(notification, '前回の作品と折り具合を再開しました。');
 });
 
 test('initialization failure unlocks the page and never starts playback or restores state', async () => {

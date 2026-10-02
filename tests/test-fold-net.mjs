@@ -24,7 +24,6 @@ test('new proportions search a connected net that can be saved and restored with
         assert.equal(polygonsOverlap(polygons[a], polygons[b]), false);
     const restored = buildPaperModel(spec, { net });
     assert.deepEqual(restored.faces, searched.faces);
-    assert.deepEqual(restored.uvs, searched.uvs);
     for (const progress of [0, 0.17, 0.5, 0.83, 1]) {
       assert.deepEqual(restored.matrices(progress), searched.matrices(progress));
       assert.deepEqual(

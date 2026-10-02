@@ -16,7 +16,7 @@ function createPaperLine(positions, options) {
   return line;
 }
 
-function createPaperFace(face, uvs, index, materials) {
+function createPaperFace(face, index, materials) {
   const corners = face.corners;
   const group = new THREE.Group();
   group.matrixAutoUpdate = false;
@@ -26,7 +26,6 @@ function createPaperFace(face, uvs, index, materials) {
     'foldHighlight',
     new THREE.Float32BufferAttribute(new Float32Array(corners.length), 1),
   );
-  geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uvs.flat(), 2));
   const minX = Math.min(...corners.map((p) => p[0])),
     maxX = Math.max(...corners.map((p) => p[0]));
   const minY = Math.min(...corners.map((p) => p[1])),
@@ -47,7 +46,7 @@ function createPaperFace(face, uvs, index, materials) {
   if (!materials.paint.has(key))
     materials.paint.set(key, decoratePaperMaterial(createPaperSurface(face.color, face.pattern)));
   const paint = materials.paint.get(key);
-  const front = new THREE.Mesh(geometry, materials.artMode ? materials.front : paint);
+  const front = new THREE.Mesh(geometry, paint);
   const back = new THREE.Mesh(geometry, materials.back);
   back.position.z = -0.012;
   for (const surface of [front, back])
@@ -85,18 +84,11 @@ export class FoldPaperMesh extends THREE.Group {
     super();
     this.groundShadow = createGroundShadow();
     this.add(this.groundShadow);
-    this.frontMaterial = new THREE.MeshPhysicalMaterial({
-      color: '#ffffff',
-      roughness: 0.87,
-      metalness: 0,
-      side: THREE.FrontSide,
-    });
     this.backMaterial = new THREE.MeshPhysicalMaterial({
       color: '#d4deec',
       roughness: 0.95,
       side: THREE.BackSide,
     });
-    decoratePaperMaterial(this.frontMaterial);
     decoratePaperMaterial(this.backMaterial);
     this.edgeMaterial = new THREE.MeshStandardMaterial({ color: '#8f9b9c', roughness: 1 });
     const creaseGeometry = new LineSegmentsGeometry().setPositions([0, 0, 0, 0, 1, 0]);
@@ -133,7 +125,6 @@ export class FoldPaperMesh extends THREE.Group {
     this.activeCrease.renderOrder = 6;
     this.add(this.activeCrease, this.hiddenCrease);
     this.faces = [];
-    this.artMode = false;
     this.paintMaterials = new Map();
   }
 
@@ -141,14 +132,12 @@ export class FoldPaperMesh extends THREE.Group {
     this.clearModel();
     this.model = model;
     const materials = {
-      front: this.frontMaterial,
       back: this.backMaterial,
       edge: this.edgeMaterial,
       paint: this.paintMaterials,
-      artMode: this.artMode,
     };
     this.faces = model.faces.map((face, index) => {
-      const surface = createPaperFace(face, model.uvs[index], index, materials);
+      const surface = createPaperFace(face, index, materials);
       this.add(surface.group);
       return surface;
     });
@@ -169,15 +158,6 @@ export class FoldPaperMesh extends THREE.Group {
       material.dispose();
     }
     this.paintMaterials.clear();
-  }
-
-  setImage(texture) {
-    this.texture?.dispose();
-    this.texture = texture;
-    this.frontMaterial.map = texture;
-    this.frontMaterial.needsUpdate = true;
-    this.backMaterial.map = this.artMode ? texture : null;
-    this.backMaterial.needsUpdate = true;
   }
 
   setFold(value, step) {
@@ -226,17 +206,10 @@ export class FoldPaperMesh extends THREE.Group {
     this.bounds = bounds;
   }
 
-  setArtMode(enabled) {
-    this.artMode = enabled;
-    for (const face of this.faces) face.front.material = enabled ? this.frontMaterial : face.paint;
-    this.backMaterial.map = enabled ? this.texture : null;
-    this.backMaterial.needsUpdate = true;
-  }
-
   setPaper(kind) {
     this.paper = kind;
     const tracing = kind === 'tracing';
-    for (const material of [this.frontMaterial, this.backMaterial, ...this.paintMaterials.values()]) {
+    for (const material of [this.backMaterial, ...this.paintMaterials.values()]) {
       material.transparent = tracing;
       material.opacity = tracing ? 0.62 : 1;
       material.depthWrite = !tracing;
@@ -268,8 +241,7 @@ export class FoldPaperMesh extends THREE.Group {
 
   dispose() {
     this.clearModel();
-    this.texture?.dispose();
-    for (const material of [this.frontMaterial, this.backMaterial, this.edgeMaterial]) material.dispose();
+    for (const material of [this.backMaterial, this.edgeMaterial]) material.dispose();
     this.activeCrease.geometry.dispose();
     this.activeCrease.material.dispose();
     this.hiddenCrease.material.dispose();

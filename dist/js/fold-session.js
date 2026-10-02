@@ -52,9 +52,6 @@ export function validateSession(value) {
             manual: camera.manual === true,
           }
         : null,
-    prompt: typeof value.prompt === 'string' ? value.prompt.slice(0, 180) : '',
-    artMode: value.artMode === true,
-    imageKey: typeof value.imageKey === 'string' ? value.imageKey.slice(0, 50) : null,
     visited: Array.isArray(value.visited)
       ? [...new Set(value.visited.filter((id) => collectionIds.has(id)))]
       : [],
@@ -79,45 +76,23 @@ export function writeSession(value, storage) {
   }
 }
 
-function openImageDatabase() {
-  return new Promise((resolve, reject) => {
-    const request = indexedDB.open('fold-atelier-images', 1);
-    request.onupgradeneeded = () => request.result.createObjectStore('images');
+async function clearLegacyImages() {
+  if (typeof indexedDB === 'undefined') return;
+  const name = 'fold-atelier-images';
+  if (indexedDB.databases && !(await indexedDB.databases()).some((database) => database.name === name))
+    return;
+  const database = await new Promise((resolve, reject) => {
+    const request = indexedDB.open(name);
+    request.onupgradeneeded = () => {
+      request.transaction.abort();
+      resolve(null);
+    };
     request.onsuccess = () => resolve(request.result);
     request.onerror = () => reject(request.error);
   });
-}
-
-// Each tab can retain its own picture without replacing another tab's saved image.
-export async function imageStore(record, key) {
-  const database = await openImageDatabase();
+  if (!database) return;
   try {
-    return await new Promise((resolve, reject) => {
-      const transaction = database.transaction('images', record ? 'readwrite' : 'readonly');
-      const store = transaction.objectStore('images');
-      const request = record ? store.put(record, record.key) : store.get(key || 'current');
-      let result;
-      request.onsuccess = () => {
-        result = request.result;
-        if (!record && key && !result) {
-          const legacy = store.get('current');
-          legacy.onsuccess = () => {
-            result = legacy.result?.key === key ? legacy.result : undefined;
-          };
-        }
-      };
-      transaction.oncomplete = () => resolve(result);
-      transaction.onerror = () => reject(transaction.error);
-      transaction.onabort = () => reject(transaction.error);
-    });
-  } finally {
-    database.close();
-  }
-}
-
-export async function clearSavedData(storage = localStorage) {
-  const database = await openImageDatabase();
-  try {
+    if (!database.objectStoreNames.contains('images')) return;
     await new Promise((resolve, reject) => {
       const transaction = database.transaction('images', 'readwrite');
       transaction.objectStore('images').clear();
@@ -128,6 +103,10 @@ export async function clearSavedData(storage = localStorage) {
   } finally {
     database.close();
   }
+}
+
+export async function clearSavedData(storage = localStorage) {
+  await clearLegacyImages();
   storage.removeItem(SESSION_KEY);
   storage.removeItem('fold-audio-volume');
 }

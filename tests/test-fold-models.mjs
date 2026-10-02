@@ -5,7 +5,6 @@ import {
   buildPaperModel,
   MODEL_PRESETS,
   COLLECTION,
-  parseModelPrompt,
   polygonsOverlap,
   recipe,
   convexFaces,
@@ -64,49 +63,31 @@ for (const preset of MODEL_PRESETS) {
     let offset = 0;
     for (const part of model.parts) {
       const edges = new Map(),
-        vertexUV = new Map();
+        vertices = new Set();
       for (let f = 0; f < part.faces.length; f++) {
         const face = closed[offset + f];
         face.forEach((point, i) => {
           const edge = [key(point), key(face[(i + 1) % face.length])].sort().join('|');
           edges.set(edge, (edges.get(edge) || 0) + 1);
-          const uv = model.uvs[offset + f][i];
-          assert.ok(
-            uv.every((x) => x >= 0 && x <= 1),
-            'UV in artwork',
-          );
-          const old = vertexUV.get(key(point));
-          if (old)
-            assert.ok(
-              uv.every((x, axis) => Math.abs(x - old[axis]) < 1e-8),
-              'continuous artwork',
-            );
-          else vertexUV.set(key(point), uv);
+          vertices.add(key(point));
         });
       }
       for (const count of edges.values()) assert.equal(count, 2, 'every edge is closed');
-      assert.equal(vertexUV.size - edges.size + part.faces.length, 2, 'Euler characteristic');
+      assert.equal(vertices.size - edges.size + part.faces.length, 2, 'Euler characteristic');
       offset += part.faces.length;
     }
   });
 }
 
-test('mock prompt preserves the requested motif, supported color and stature', () => {
-  assert.deepEqual(parseModelPrompt('赤い、背の高いロボット'), {
-    kind: 'robot',
-    color: '#b8503e',
-    colorName: '赤',
-    stature: 1.3,
-  });
-  assert.equal(parseModelPrompt('マイクラの人').kind, 'person');
-  assert.equal(parseModelPrompt('青い十二面体').kind, 'dodecahedron');
-  assert.equal(parseModelPrompt('空飛ぶドラゴン'), null);
-  const heights = [1, 1.3].map((stature) => {
-    const model = buildPaperModel({ kind: 'robot', stature });
+test('saved model specifications preserve color and stature', () => {
+  const statures = [1, 0.78, 1.3];
+  const heights = statures.map((stature) => {
+    const model = buildPaperModel({ kind: 'robot', color: '#b8503e', stature });
+    assert.ok(model.faces.some((face) => face.color === '#b8503e'));
     const points = model.vertices(1).flat();
     return Math.max(...points.map((p) => p.y)) - Math.min(...points.map((p) => p.y));
   });
-  assert.ok(Math.abs(heights[1] / heights[0] - 1.3) < 1e-9);
+  heights.forEach((height, index) => assert.ok(Math.abs(height / heights[0] - statures[index]) < 1e-9));
 });
 
 test('100 distinct complex models: one sheet, no overlap, closed surfaces and attached hinges throughout folding', () => {

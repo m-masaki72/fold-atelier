@@ -109,24 +109,26 @@ test('paper mesh keeps shared face geometry, crease endpoints and bounds aligned
   paper.dispose();
 });
 
-test('artwork and translucent paper retain surface assignments when child order changes', () => {
+test('colored paper retains front patterns and plain back surfaces when child order changes', () => {
   const paper = new FoldPaperMesh();
   paper.setModel(buildPaperModel({ kind: 'person' }));
-  const texture = new THREE.Texture();
-  paper.setImage(texture);
   for (const face of paper.faces) face.group.children.reverse();
-  paper.setArtMode(true);
   paper.setPaper('tracing');
   for (const face of paper.faces) {
-    assert.equal(face.front.material, paper.frontMaterial);
-    assert.equal(face.front.material.map, texture);
-    assert.equal(face.back.material.map, texture);
+    assert.equal(face.front.material, face.paint);
+    assert.equal(face.back.material, paper.backMaterial);
+    assert.equal(face.back.material.map, null);
+    assert.equal(face.front.geometry.getAttribute('uv'), undefined);
+    assert.equal(
+      face.front.geometry.getAttribute('uv1').count,
+      face.front.geometry.getAttribute('position').count,
+    );
+    if (face.paint.map) assert.equal(face.paint.map.channel, 1);
     assert.equal(face.front.material.opacity, 0.62);
     assert.equal(face.back.material.depthWrite, false);
     assert.equal(face.outline.material.opacity, 0.5);
     assert.equal(face.creases.material.opacity, 0.3);
   }
-  paper.setArtMode(false);
   paper.setPaper('washi');
   for (const face of paper.faces) {
     assert.equal(face.front.material, face.paint);
@@ -171,15 +173,7 @@ test('translucent coplanar surfaces receive stable shared depths from the active
 test('changing models frees only model-owned resources and final disposal releases shared resources once', () => {
   const paper = new FoldPaperMesh();
   paper.setModel(buildPaperModel({ kind: 'person' }));
-  const oldTexture = new THREE.Texture();
-  const texture = new THREE.Texture();
-  const oldTextureDisposal = observeDisposal([oldTexture]);
-  paper.setImage(oldTexture);
-  paper.setImage(texture);
-  assert.equal(oldTextureDisposal.get(oldTexture), 1);
   const shared = observeDisposal([
-    texture,
-    paper.frontMaterial,
     paper.backMaterial,
     paper.edgeMaterial,
     paper.activeCrease.geometry,
@@ -191,12 +185,11 @@ test('changing models frees only model-owned resources and final disposal releas
   ]);
   const oldFaces = paper.faces;
   const replaced = observeDisposal(modelResources(paper));
-  paper.setArtMode(true);
   paper.setModel(buildPaperModel({ kind: 'cube' }));
   assert.ok([...replaced.values()].every((count) => count === 1));
   assert.ok([...shared.values()].every((count) => count === 0));
   assert.ok(oldFaces.every((face) => face.group.parent === null));
-  assert.ok(paper.faces.every((face) => face.front.material.map === texture));
+  assert.ok(paper.faces.every((face) => face.front.material === face.paint));
   const finalModel = observeDisposal(modelResources(paper));
   paper.dispose();
   assert.ok([...finalModel.values()].every((count) => count === 1));

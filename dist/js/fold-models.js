@@ -1,5 +1,4 @@
 import * as THREE from 'three';
-import { artworkProjection } from './fold-geometry.js';
 import { exteriorSurface } from './fold-topology.js';
 import { unfoldPart, foldMatrices } from './fold-net.js';
 import { MODEL_PRESETS, recipe } from './fold-recipes.js';
@@ -7,7 +6,7 @@ import { STUDY_FAMILIES } from './fold-collection.js';
 import { NETS, COLLECTION } from './fold-net-data.js';
 import { createFoldSequence } from './fold-sequence.js';
 
-export { MODEL_PRESETS, parseModelPrompt, recipe } from './fold-recipes.js';
+export { MODEL_PRESETS, recipe } from './fold-recipes.js';
 export { convexFaces } from './fold-topology.js';
 export { polygonsOverlap } from './fold-net.js';
 export { COLLECTION } from './fold-net-data.js';
@@ -68,8 +67,6 @@ export function buildPaperModel(spec, { net, useCache = true } = {}) {
     matrices(fold).map((frame, index) =>
       faces[index].corners.map((point) => new THREE.Vector3(...point).applyMatrix4(frame)),
     );
-  const closed = vertices(1);
-  const projectArtwork = artworkProjection(closed.flat());
   return {
     spec,
     label:
@@ -82,6 +79,5 @@ export function buildPaperModel(spec, { net, useCache = true } = {}) {
     faces,
     matrices,
     vertices,
-    uvs: closed.map((polygon) => polygon.map(projectArtwork)),
   };
 }

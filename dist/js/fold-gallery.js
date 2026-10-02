@@ -1,11 +1,11 @@
-import { MODEL_PRESETS, parseModelPrompt } from './fold-recipes.js';
+import { MODEL_PRESETS } from './fold-recipes.js';
 import { COLLECTION } from './fold-net-data.js';
 import { STUDY_FAMILIES } from './fold-collection.js';
 import { createCollectionHistory } from './fold-history.js';
 
 const $ = (selector) => document.querySelector(selector);
 
-export function createGallery({ state, setModel, setTouring, setPlaying, closeTools, toast, reducedMotion }) {
+export function createGallery({ state, setModel, setTouring, setPlaying, closeTools, toast }) {
   const history = createCollectionHistory();
   const visited = history.visited;
   const shuffled = [...COLLECTION];
@@ -23,7 +23,7 @@ export function createGallery({ state, setModel, setTouring, setPlaying, closeTo
   }
 
   function reflectModel(id) {
-    $('#collection-prev').disabled = state.modelGenerating || !history.canGoBack(id);
+    $('#collection-prev').disabled = !history.canGoBack(id);
     const entry = COLLECTION.find((item) => item.id === id);
     $('#collection-current').textContent = entry
       ? `${entry.label} · ${entry.faces}面 · つながる一枚`
@@ -48,43 +48,6 @@ export function createGallery({ state, setModel, setTouring, setPlaying, closeTo
     if (entry) showStudy(entry);
   }
 
-  function setGenerating(value) {
-    state.modelGenerating = value;
-    document
-      .querySelectorAll(
-        '#model-generate, #model-select, [data-prompt], .collection-controls button, #collection-open, [data-study]',
-      )
-      .forEach((control) => {
-        control.disabled = value;
-      });
-    $('#collection-prev').disabled = value || !history.canGoBack(state.model);
-  }
-
-  async function generateModel(event) {
-    event?.preventDefault();
-    if (state.modelGenerating) return;
-    setTouring(false);
-    const prompt = $('#model-prompt').value;
-    const spec = parseModelPrompt(prompt);
-    if (!spec) {
-      $('#model-status').textContent =
-        'まだその形は用意していません。人・ロボット・ねこ・家・ロケット・お城、または多面体を試してください。';
-      $('#model-prompt').focus();
-      return;
-    }
-    setGenerating(true);
-    $('#model-status').textContent = '外側の面をつないで、一枚の展開図を作っています…';
-    await new Promise((resolve) => setTimeout(resolve, reducedMotion ? 0 : 450));
-    try {
-      setModel(spec);
-      closeTools();
-    } catch {
-      $('#model-status').textContent = 'その形の展開図を作れませんでした。別の形を試してください。';
-    } finally {
-      setGenerating(false);
-    }
-  }
-
   function init() {
     for (const preset of MODEL_PRESETS) {
       const option = document.createElement('option');
@@ -105,7 +68,7 @@ export function createGallery({ state, setModel, setTouring, setPlaying, closeTo
       card.dataset.family = entry.family;
       card.setAttribute('aria-pressed', 'false');
       const img = document.createElement('img');
-      img.src = entry.thumbnail;
+      img.dataset.src = entry.thumbnail;
       img.alt = '';
       img.loading = 'lazy';
       img.width = 220;
@@ -145,6 +108,10 @@ export function createGallery({ state, setModel, setTouring, setPlaying, closeTo
     $('#collection-open').addEventListener('click', () => {
       setTouring(false);
       closeTools();
+      document.querySelectorAll('#collection-grid img[data-src]').forEach((image) => {
+        image.src = image.dataset.src;
+        delete image.dataset.src;
+      });
       $('#collection-dialog').showModal();
     });
     $('#collection-next').addEventListener('click', () => {
@@ -180,17 +147,9 @@ export function createGallery({ state, setModel, setTouring, setPlaying, closeTo
         return;
       }
       const preset = MODEL_PRESETS.find((item) => item.id === $('#model-select').value);
-      $('#model-prompt').value = preset.prompt;
-      setModel(parseModelPrompt(preset.prompt));
+      setModel({ kind: preset.id });
       closeTools();
     });
-    $('#model-form').addEventListener('submit', generateModel);
-    document.querySelectorAll('[data-prompt]').forEach((button) =>
-      button.addEventListener('click', () => {
-        $('#model-prompt').value = button.dataset.prompt;
-        generateModel();
-      }),
-    );
   }
   function restore(saved) {
     history.restore(saved);

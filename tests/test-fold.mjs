@@ -2,7 +2,6 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import { buildPaperModel } from '../dist/js/fold-models.js';
-import { artworkProjection, VIEW_DIRECTION } from '../dist/js/fold-geometry.js';
 
 test('flat net has six non-overlapping squares with five common hinges', () => {
   const model = buildPaperModel({ kind: 'cube' });
@@ -40,10 +39,9 @@ test('flat net has six non-overlapping squares with five common hinges', () => {
   }
 });
 
-test('closed cube has eight vertices, twelve paired edges and continuous artwork at every seam', () => {
+test('closed cube has eight vertices shared by three faces and twelve paired edges', () => {
   const model = buildPaperModel({ kind: 'cube' });
-  const faces = model.vertices(1),
-    uvs = model.uvs;
+  const faces = model.vertices(1);
   const points = new Map(),
     edges = new Map();
   const key = (p) =>
@@ -51,11 +49,10 @@ test('closed cube has eight vertices, twelve paired edges and continuous artwork
       .toArray()
       .map((v) => (Math.abs(v) < 1e-7 ? '0.000000' : v.toFixed(6)))
       .join(',');
-  faces.forEach((face, f) =>
+  faces.forEach((face) =>
     face.forEach((p, v) => {
       const id = key(p);
-      if (!points.has(id)) points.set(id, []);
-      points.get(id).push(uvs[f][v]);
+      points.set(id, (points.get(id) || 0) + 1);
       const edge = [id, key(face[(v + 1) % 4])].sort().join('|');
       edges.set(edge, (edges.get(edge) || 0) + 1);
     }),
@@ -63,26 +60,5 @@ test('closed cube has eight vertices, twelve paired edges and continuous artwork
   assert.equal(points.size, 8);
   assert.equal(edges.size, 12);
   for (const count of edges.values()) assert.equal(count, 2);
-  for (const entries of points.values()) {
-    assert.equal(entries.length, 3);
-    for (const uv of entries)
-      for (let axis = 0; axis < 2; axis++) assert.ok(Math.abs(uv[axis] - entries[0][axis]) < 1e-10);
-  }
-});
-
-test('UV projection stays within artwork and maps the viewing direction to the same pixel', () => {
-  for (const kind of ['cube', 'person', 'study-077']) {
-    const model = buildPaperModel({ kind });
-    const vertices = model.vertices(1);
-    const project = artworkProjection(vertices.flat());
-    vertices.forEach((face, index) =>
-      face.forEach((point, corner) => {
-        const uv = project(point);
-        assert.deepEqual(uv, model.uvs[index][corner]);
-        assert.ok(uv.every((value) => value >= 0 && value <= 1));
-        const alongRay = project(point.clone().addScaledVector(VIEW_DIRECTION, 3));
-        assert.ok(uv.every((value, axis) => Math.abs(value - alongRay[axis]) < 1e-10));
-      }),
-    );
-  }
+  for (const count of points.values()) assert.equal(count, 3);
 });
