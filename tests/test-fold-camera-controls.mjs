@@ -94,6 +94,61 @@ function drag({ canvas, view }, x = 100, y = 0) {
   renderFrames(view, 6);
 }
 
+test('camera buttons rotate in both axes without changing the target or orbit radius', (t) => {
+  const { view } = fixture(t);
+  const start = view.camera.position.clone();
+  const target = view.controls.target.clone();
+  const radius = start.distanceTo(target);
+  let notifications = 0;
+  view.onCameraChange = () => notifications++;
+  view.adjustCamera('left');
+  assert.ok(view.camera.position.distanceTo(start) > 0.1);
+  view.adjustCamera('right');
+  assert.ok(view.camera.position.distanceTo(start) < 1e-8);
+  view.adjustCamera('up');
+  assert.ok(view.camera.position.y > start.y);
+  view.adjustCamera('down');
+  assert.ok(view.camera.position.distanceTo(start) < 1e-8);
+  assert.ok(view.controls.target.distanceTo(target) < 1e-8);
+  assert.ok(Math.abs(view.camera.position.distanceTo(target) - radius) < 1e-8);
+  assert.equal(view.manualCamera, true);
+  assert.equal(view.needsRender, true);
+  assert.equal(notifications, 4);
+});
+
+test('camera buttons respect the same zoom and polar limits as pointer controls', (t) => {
+  const { view } = fixture(t);
+  for (let i = 0; i < 40; i++) view.adjustCamera('zoom-in');
+  assert.equal(view.camera.zoom, view.controls.maxZoom);
+  for (let i = 0; i < 40; i++) view.adjustCamera('zoom-out');
+  assert.equal(view.camera.zoom, view.controls.minZoom);
+  for (let i = 0; i < 40; i++) view.adjustCamera('up');
+  const polar = () => new THREE.Spherical().setFromVector3(direction(view)).phi;
+  assert.ok(Math.abs(polar() - view.controls.minPolarAngle) < 1e-8);
+  for (let i = 0; i < 40; i++) view.adjustCamera('down');
+  assert.ok(Math.abs(polar() - view.controls.maxPolarAngle) < 1e-8);
+});
+
+test('camera adjustment clears drag inertia, pauses focus and allows focus to resume', (t) => {
+  const f = fixture(t);
+  f.view.setCameraMode('focus');
+  renderFrames(f.view);
+  const focusDirection = direction(f.view);
+  drag(f, 100, 40);
+  f.view.adjustCamera('right');
+  const adjusted = direction(f.view);
+  assert.equal(f.view.manualCamera, true);
+  assert.equal(f.view.focused, true);
+  assert.equal(f.view.frameGoal, null);
+  assert.equal(f.view.cameraSettling, false);
+  renderFrames(f.view);
+  assertDirection(f.view, adjusted, 'button adjustment after drag');
+  f.view.setCameraMode('focus');
+  renderFrames(f.view);
+  assertDirection(f.view, focusDirection, 'focus resume after button adjustment');
+  assert.equal(f.view.manualCamera, false);
+});
+
 test('smooth focus resume returns to the selected crease after manual rotation', (t) => {
   const f = fixture(t);
   f.view.setCameraMode('focus');

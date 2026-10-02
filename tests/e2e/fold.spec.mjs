@@ -31,6 +31,9 @@ test('site metadata, favicon, share image and sitemap point to the published app
   const iconResponse = await request.get(new URL(icon, page.url()).href);
   expect(iconResponse.ok()).toBe(true);
   expect(iconResponse.headers()['content-type']).toContain('image/svg+xml');
+  const touchIcon = await request.get('/dist/apple-touch-icon.png');
+  expect(touchIcon.ok()).toBe(true);
+  expect((await touchIcon.body()).subarray(0, 8)).toEqual(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]));
   const imageResponse = await request.get('/dist/images/fold/social-preview.jpg');
   expect(imageResponse.ok()).toBe(true);
   expect(imageResponse.headers()['content-type']).toContain('image/jpeg');
@@ -220,4 +223,143 @@ test('mobile tools return their content and focus correctly after a width change
   await expect(page.locator('#tools-slot #tools-content')).toBeVisible();
   await expect(page.locator('#art-open')).toBeFocused();
   await page.screenshot({ path: test.info().outputPath('tools-restored.png'), fullPage: true });
+});
+
+for (const failure of ['module', 'webgl']) {
+  test(`startup ${failure} failure offers recovery and disables unavailable controls`, async ({ page }) => {
+    if (failure === 'module') await page.route('**/js/fold.js', (route) => route.abort());
+    else
+      await page.addInitScript(() => {
+        const getContext = HTMLCanvasElement.prototype.getContext;
+        HTMLCanvasElement.prototype.getContext = function (type, ...args) {
+          return type.startsWith('webgl') ? null : getContext.call(this, type, ...args);
+        };
+      });
+    await page.goto('/dist/fold.html');
+    await expect(page.locator('#startup-error')).toBeVisible();
+    await expect(page.locator('#loading')).toBeHidden();
+    expect(await page.locator('.workspace').evaluate((node) => node.inert)).toBe(true);
+    expect(await page.locator('.header-tools').evaluate((node) => node.inert)).toBe(true);
+    await expect(page.getByRole('link', { name: '再読み込みする' })).toHaveAttribute('href', './fold.html');
+  });
+}
+
+async function uploadPicture(page, name) {
+  await page.locator('#tool-paper summary').click();
+  await page.locator('#art-open').click();
+  await page
+    .locator('#image-upload')
+    .setInputFiles({ name: `${name}.png`, mimeType: 'image/png', buffer: pixel });
+  await expect(page.locator('#art-dialog')).not.toBeVisible();
+}
+
+test('image persistence failure stays visible after upload success', async ({ page }) => {
+  await page.addInitScript(() => {
+    indexedDB.open = () => {
+      throw new DOMException('Storage denied', 'SecurityError');
+    };
+  });
+  await openApp(page);
+  await uploadPicture(page, 'temporary');
+  await expect(page.locator('#image-save-status')).toBeVisible();
+  await expect(page.locator('#image-save-status')).toContainText('次回は画像を選び直して');
+  await expect(page.locator('#art-title')).toHaveText('temporary');
+  expect(await page.evaluate(() => window.__FOLD__.snapshot().imageKey)).toBeNull();
+});
+
+test('keyboard camera buttons rotate and zoom without changing the fold', async ({ page }) => {
+  await openApp(page);
+  await page.evaluate(() => window.__FOLD__.setFold(0.5));
+  await page.locator('#focus-step').click();
+  const before = await page.evaluate(() => window.__FOLD__.snapshot());
+  await page.locator('[data-camera="left"]').focus();
+  await page.keyboard.press('Enter');
+  const rotated = await page.evaluate(() => window.__FOLD__.snapshot());
+  expect(rotated.camera).not.toEqual(before.camera);
+  expect(rotated.fold).toBe(0.5);
+  await expect(page.locator('#camera-resume')).toBeVisible();
+  const previousZoom = await page.evaluate(
+    () => JSON.parse(localStorage.getItem('fold-atelier-session-v1')).camera.zoom,
+  );
+  await page.locator('[data-camera="zoom-in"]').focus();
+  await page.keyboard.press('Enter');
+  expect(
+    await page.evaluate(() => JSON.parse(localStorage.getItem('fold-atelier-session-v1')).camera.zoom),
+  ).toBeGreaterThan(previousZoom);
+});
+
+test('different tabs keep each uploaded image available for resuming', async ({ page, context }) => {
+  await openApp(page);
+  await uploadPicture(page, 'first');
+  await expect.poll(() => page.evaluate(() => window.__FOLD__.snapshot().imageKey)).toBeTruthy();
+  const firstKey = await page.evaluate(() => window.__FOLD__.snapshot().imageKey);
+  const other = await context.newPage();
+  await openApp(other);
+  await uploadPicture(other, 'second');
+  await expect.poll(() => other.evaluate(() => window.__FOLD__.snapshot().imageKey)).toBeTruthy();
+  expect(await other.evaluate(() => window.__FOLD__.snapshot().imageKey)).not.toBe(firstKey);
+  await other.close();
+  await page.evaluate(() => window.__FOLD__.setFold(0.4));
+  await expect
+    .poll(() => page.evaluate(() => JSON.parse(localStorage.getItem('fold-atelier-session-v1')).fold))
+    .toBe(0.4);
+  await page.reload();
+  await expect.poll(() => page.evaluate(() => window.__FOLD__?.snapshot().ready)).toBe(true);
+  await expect(page.locator('#art-title')).toHaveText('first');
+  expect(await page.evaluate(() => window.__FOLD__.snapshot().imageKey)).toBe(firstKey);
+});
+
+test('clearing saved data removes pictures settings and resumes from defaults', async ({ page }) => {
+  await openApp(page);
+  await uploadPicture(page, 'forget-me');
+  await expect.poll(() => page.evaluate(() => window.__FOLD__.snapshot().imageKey)).toBeTruthy();
+  const savedKey = await page.evaluate(() => window.__FOLD__.snapshot().imageKey);
+  await page.locator('#bgm-volume').evaluate((node) => {
+    node.value = '80';
+    node.dispatchEvent(new Event('input'));
+  });
+  await page.locator('#clear-saved-data').click();
+  await page.locator('#clear-data-dialog').getByRole('button', { name: 'キャンセル' }).click();
+  await expect(page.locator('#art-title')).toHaveText('forget-me');
+  await page.locator('#clear-saved-data').click();
+  await Promise.all([page.waitForEvent('load'), page.locator('#confirm-clear-data').click()]);
+  await expect.poll(() => page.evaluate(() => window.__FOLD__?.snapshot().ready)).toBe(true);
+  await expect(page.locator('#art-title')).toHaveText('日輪をわたる');
+  expect(await page.evaluate(() => window.__FOLD__.snapshot().imageKey)).toBeNull();
+  expect(await page.evaluate(() => window.__FOLD__.snapshot().audio.volumes.bgm)).toBe(0.32);
+  const images = await page.evaluate(async (key) => {
+    const { imageStore } = await import('./js/fold-session.js');
+    return imageStore(undefined, key);
+  }, savedKey);
+  expect(images).toBeUndefined();
+});
+
+test('clearing in another tab stops stale automatic saves', async ({ page, context }) => {
+  await openApp(page);
+  await uploadPicture(page, 'old-picture');
+  await expect.poll(() => page.evaluate(() => window.__FOLD__.snapshot().imageKey)).toBeTruthy();
+  const other = await context.newPage();
+  await openApp(other);
+  await page.locator('#sound-toggle').click();
+  await page.locator('#art-open').click();
+  await other.locator('#clear-saved-data').click();
+  await Promise.all([other.waitForEvent('load'), other.locator('#confirm-clear-data').click()]);
+  await expect(page.locator('#storage-reset')).toBeVisible();
+  await expect(page.locator('#art-dialog')).not.toBeVisible();
+  await expect(page.getByRole('link', { name: '最初から開き直す' })).toBeVisible();
+  await expect.poll(() => page.evaluate(() => window.__FOLD__.snapshot().audio.voices)).toBe(0);
+  expect(await page.locator('.workspace').evaluate((node) => node.inert)).toBe(true);
+  await page.close();
+  await other.reload();
+  await expect.poll(() => other.evaluate(() => window.__FOLD__?.snapshot().ready)).toBe(true);
+  await expect(other.locator('#art-title')).toHaveText('日輪をわたる');
+  expect(await other.evaluate(() => window.__FOLD__.snapshot().imageKey)).toBeNull();
+});
+
+test('reduced motion and narrow screens remain usable', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.setViewportSize({ width: 320, height: 800 });
+  await openApp(page);
+  expect(await page.evaluate(() => window.__FOLD__.snapshot().playing)).toBe(false);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)).toBe(false);
 });

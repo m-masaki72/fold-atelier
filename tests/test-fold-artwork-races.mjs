@@ -162,6 +162,9 @@ async function fixture(t) {
     get imageStatus() {
       return element('#image-status').textContent;
     },
+    get imageSaveStatus() {
+      return element('#image-save-status').textContent;
+    },
     upload(name, type = 'image/png') {
       const file = new Blob([name], { type });
       file.name = `${name}.png`;
@@ -173,6 +176,56 @@ async function fixture(t) {
 }
 
 const saved = (key) => ({ key, blob: new Blob([key]), title: key, credit: 'Test' });
+
+test('a failed image save stays visible after the upload success toast and clears after a successful save', async (t) => {
+  const f = await fixture(t);
+  f.controls.write = async () => {
+    throw new Error('Quota');
+  };
+  await f.upload('Unsaved');
+  assert.match(f.imageSaveStatus, /保存できませんでした/);
+  assert.equal(f.toasts.at(-1), 'あなたの絵を、紙にのせました。');
+  assert.equal(f.state.imageKey, null);
+  f.open();
+  assert.match(f.imageSaveStatus, /保存できませんでした/);
+  f.controls.write = async () => {};
+  await f.upload('Saved');
+  assert.equal(f.imageSaveStatus, '');
+  assert.match(f.state.imageKey, /^[0-9a-f-]{36}$/);
+});
+
+test('forgetting an image waits for its active save and prevents the old request from publishing its key', async (t) => {
+  const f = await fixture(t);
+  const writing = deferred();
+  f.controls.write = () => writing.promise;
+  const uploading = f.upload('Pending');
+  await until(() => f.writes.length === 1);
+  let forgotten = false;
+  const forgetting = f.artwork.forget().then(() => {
+    forgotten = true;
+  });
+  await Promise.resolve();
+  assert.equal(forgotten, false);
+  writing.resolve();
+  await Promise.all([uploading, forgetting]);
+  assert.equal(forgotten, true);
+  assert.equal(f.state.imageKey, null);
+  assert.deepEqual(f.toasts, []);
+});
+
+test('forgetting an image invalidates conversion that has not reached the save queue', async (t) => {
+  const f = await fixture(t);
+  const reading = deferred();
+  f.controls.read = () => reading.promise;
+  const uploading = f.upload('Pending');
+  await until(() => f.fetches.length === 1);
+  await f.artwork.forget();
+  reading.resolve(new Blob(['pending image']));
+  await uploading;
+  assert.deepEqual(f.writes, []);
+  assert.equal(f.state.imageKey, null);
+  assert.deepEqual(f.toasts, []);
+});
 
 test('artwork initialization is synchronous and does not make a network request', async (t) => {
   const f = await fixture(t);

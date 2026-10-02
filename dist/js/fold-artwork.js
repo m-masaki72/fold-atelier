@@ -40,23 +40,26 @@ export function createArtwork({ view, state, setArtMode, goTo, closeTools, toast
     goTo(0.58);
     view.home();
     closeTools();
+    $('#image-save-status').textContent = '';
     if (source.startsWith('blob:')) {
       try {
-        const key = `image-${Date.now()}`;
+        const key = crypto.randomUUID();
         const blob = await (await fetch(source)).blob();
-        // A late conversion must not replace the newer image in the single saved slot.
+        if (request !== requestId) return false;
         const save = saveQueue.then(async () => {
-          if (state.imageSource !== source) return;
+          if (request !== requestId || state.imageSource !== source) return;
           await imageStore({ key, blob, title, credit });
-          if (state.imageSource === source) state.imageKey = key;
+          if (request === requestId && state.imageSource === source) state.imageKey = key;
         });
         saveQueue = save.catch(() => {});
         await save;
       } catch {
-        if (state.imageSource === source)
-          toast('絵を表示しました。画像の次回復元は、このブラウザでは利用できません。');
+        if (request === requestId && state.imageSource === source)
+          $('#image-save-status').textContent =
+            '絵は表示できましたが、保存できませんでした。次回は画像を選び直してください。';
       }
     }
+    if (request !== requestId) return false;
     saveSession();
     return request === requestId && state.imageSource === source;
   }
@@ -143,8 +146,15 @@ export function createArtwork({ view, state, setArtMode, goTo, closeTools, toast
   async function restore(image) {
     return applyBlob(image.blob, image.title, image.credit, ++requestId, image.key);
   }
+  async function forget() {
+    requestId++;
+    await saveQueue;
+    state.imageKey = null;
+    $('#image-save-status').textContent = '';
+  }
   return {
     init,
     restore,
+    forget,
   };
 }

@@ -4,7 +4,7 @@ import { createGallery } from './fold-gallery.js';
 import { createArtwork } from './fold-artwork.js';
 import { advancePlayback, END_HOLD_SECONDS, STEP_SECONDS } from './fold-sequence.js';
 import { FoldAudio, audibleFold } from './fold-audio.js';
-import { imageStore } from './fold-session.js';
+import { imageStore, clearSavedData, SESSION_KEY } from './fold-session.js';
 import { createSessionController, startApp } from './fold-lifecycle.js';
 import { CompletedPreview, stepReplayPlan, playbackLabel } from './fold-guidance.js';
 
@@ -32,6 +32,7 @@ let view,
   animation = null,
   previousTime = 0;
 let artwork;
+let saveBlocked = false;
 const gallery = createGallery({
   state,
   setModel,
@@ -48,8 +49,9 @@ const session = createSessionController({
   apply: applySession,
   restoreArtwork: async (key) => {
     if (!key) return;
-    const image = await imageStore().catch(() => null);
-    if (image?.key === key) await artwork.restore(image);
+    const image = await imageStore(undefined, key).catch(() => null);
+    if (image?.key !== key) return false;
+    return artwork.restore(image);
   },
   reset: () => setModel({ kind: 'person' }),
   onSave: (success) => {
@@ -57,7 +59,9 @@ const session = createSessionController({
   },
   notify: toast,
 });
-const saveSession = session.save;
+const saveSession = () => {
+  if (!saveBlocked) session.save();
+};
 function setTouring(value) {
   state.touring = value;
   tourElapsed = 0;
@@ -285,7 +289,7 @@ function setModel(spec, animate = true) {
 function frame(now) {
   const dt = previousTime ? Math.min((now - previousTime) / 1000, 0.05) : 0;
   previousTime = now;
-  const visible = !document.hidden && !document.querySelector('dialog[open]');
+  const visible = !saveBlocked && !document.hidden && !document.querySelector('dialog[open]');
   sound.setVisible(visible);
   if (visible) {
     if (state.touring && reducedMotion) {
@@ -394,6 +398,37 @@ function bindControls() {
     view.top();
     if (mobile.matches) $('.view-menu').open = false;
   });
+  document.querySelectorAll('[data-camera]').forEach((button) => {
+    button.addEventListener('click', () => {
+      view.adjustCamera(button.dataset.camera);
+      updateFocusControl();
+      saveSession();
+    });
+  });
+  $('#clear-saved-data').disabled = false;
+  $('#clear-saved-data').addEventListener('click', () => {
+    $('#clear-data-error').textContent = '';
+    $('#clear-data-dialog').showModal();
+  });
+  $('#clear-data-dialog').addEventListener('cancel', (event) => {
+    if (saveBlocked) event.preventDefault();
+  });
+  $('#confirm-clear-data').addEventListener('click', async () => {
+    saveBlocked = true;
+    $('#confirm-clear-data').disabled = true;
+    $('#clear-data-dialog form button').disabled = true;
+    try {
+      await artwork.forget();
+      await clearSavedData();
+      location.reload();
+    } catch {
+      saveBlocked = false;
+      $('#confirm-clear-data').disabled = false;
+      $('#clear-data-dialog form button').disabled = false;
+      $('#clear-data-error').textContent =
+        '保存データを消せませんでした。他のFOLDのタブを閉じて、もう一度お試しください。';
+    }
+  });
   $('#fold-viewport').addEventListener('keydown', (event) => {
     if (event.ctrlKey || event.altKey || event.metaKey) return;
     if (event.repeat) {
@@ -442,11 +477,24 @@ function bindControls() {
   });
   document.addEventListener('visibilitychange', () => {
     if (document.hidden) saveSession();
-    sound.setVisible(!document.hidden && !document.querySelector('dialog[open]'));
+    sound.setVisible(!saveBlocked && !document.hidden && !document.querySelector('dialog[open]'));
   });
   window.addEventListener('pagehide', () => {
     saveSession();
     sound.setVisible(false);
+  });
+  window.addEventListener('storage', (event) => {
+    if (event.key !== SESSION_KEY || event.newValue !== null || !event.oldValue) return;
+    saveBlocked = true;
+    setTouring(false);
+    setPlaying(false);
+    sound.setVisible(false);
+    document.querySelectorAll('dialog[open]').forEach((dialog) => dialog.close());
+    artwork.forget().catch(() => {});
+    $('.workspace').inert = true;
+    $('.header-tools').inert = true;
+    $('#clear-saved-data').disabled = true;
+    $('#storage-reset').hidden = false;
   });
   $('#capture').addEventListener('click', async () => {
     const filename = `fold-${Math.round(state.fold * 100)}.png`;
@@ -519,7 +567,8 @@ function activate() {
 
 startApp({
   setInteractive: (enabled) => {
-    document.body.inert = !enabled;
+    $('.workspace').inert = !enabled || !state.ready || saveBlocked;
+    $('.header-tools').inert = !enabled || !state.ready || saveBlocked;
   },
   initialize: async () => {
     await initializeView();
@@ -528,7 +577,6 @@ startApp({
   restore: session.restore,
   activate,
   onError: () => {
-    $('#loading').hidden = false;
-    $('#loading').textContent = '3D表示を開始できませんでした。WebGL対応ブラウザで再読み込みしてください。';
+    window.dispatchEvent(new Event('fold-startup-error'));
   },
 });

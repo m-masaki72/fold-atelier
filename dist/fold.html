@@ -10,6 +10,7 @@
     />
     <title>FOLD — 折りかけの美術室</title>
     <link rel="icon" type="image/svg+xml" sizes="any" href="./favicon.svg" />
+    <link rel="apple-touch-icon" sizes="180x180" href="./apple-touch-icon.png" />
     <link rel="canonical" href="https://m-masaki72.github.io/fold-atelier/dist/fold.html" />
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="FOLD" />
@@ -57,7 +58,7 @@
         ><svg viewBox="0 0 36 36" aria-hidden="true"><path d="M7 29V7L29 13L18 20Z M7 7L18 20V30" /></svg
         ><span>FOLD</span><span class="brand-caption">折りかけの美術室</span></a
       >
-      <div class="header-tools">
+      <div class="header-tools" inert>
         <button id="sound-toggle" class="text-button" aria-pressed="false">♪ 音 OFF</button>
         <details class="volume-menu">
           <summary>音量</summary>
@@ -73,7 +74,16 @@
         <button id="capture">画像を保存 <span aria-hidden="true">↗</span></button>
       </div>
     </header>
-    <main class="workspace">
+    <section id="startup-error" role="alert" hidden>
+      <h2>FOLDを開始できませんでした。</h2>
+      <p>通信状態を確認し、WebGL 2対応ブラウザで開き直してください。</p>
+      <a href="./fold.html">再読み込みする</a>
+    </section>
+    <section id="storage-reset" role="alert" hidden>
+      <p>別のタブで保存データが消されました。</p>
+      <a href="./fold.html">最初から開き直す</a>
+    </section>
+    <main class="workspace" inert>
       <div class="model-area">
         <section class="stage" aria-label="紙の立体作品">
           <div class="stage-top">
@@ -110,6 +120,11 @@
               <summary>向き <span aria-hidden="true">⌄</span></summary>
               <div class="view-options">
                 <button id="reset-view">向きだけ戻す</button><button id="view-top">真上から</button>
+                <button data-camera="left" aria-label="カメラを左へ回す">左へ</button>
+                <button data-camera="right" aria-label="カメラを右へ回す">右へ</button>
+                <button data-camera="up" aria-label="カメラを上へ回す">上へ</button>
+                <button data-camera="down" aria-label="カメラを下へ回す">下へ</button>
+                <button data-camera="zoom-in">拡大</button><button data-camera="zoom-out">縮小</button>
               </div>
             </details>
           </div>
@@ -245,9 +260,23 @@
       </div>
     </main>
     <footer class="footer">
-      <span id="save-status">このブラウザに自動保存</span><span>完成するまでの、すべてが作品。</span>
+      <div>
+        <span id="save-status">このブラウザに自動保存</span>
+        <p id="image-save-status" role="status"></p>
+        <button id="clear-saved-data" class="text-button" disabled>保存データを消す</button>
+      </div>
+      <span>完成するまでの、すべてが作品。</span>
     </footer>
     <p id="toast" role="status" hidden></p>
+    <dialog id="clear-data-dialog" aria-labelledby="clear-data-title">
+      <h2 id="clear-data-title">このブラウザの保存データを消しますか？</h2>
+      <p>
+        作品・折り具合・保存した画像・音量を消して、最初から開き直します。他のタブで開いているFOLDも閉じてください。
+      </p>
+      <p id="clear-data-error" role="status"></p>
+      <form method="dialog"><button>キャンセル</button></form>
+      <button id="confirm-clear-data">消して最初から開く</button>
+    </dialog>
     <dialog id="preview-dialog" aria-labelledby="preview-title">
       <form method="dialog" class="dialog-heading">
         <h2 id="preview-title">かたちの完成見本</h2>
@@ -306,6 +335,6 @@
       <img id="source-image" src="./images/fold/crane.png" alt="立体に配置した元の絵" />
       <p>この絵を、立体の面へつなげて配置しています。</p>
     </dialog>
-    <script type="module" src="./js/fold.js"></script>
+    <script src="./js/fold-bootstrap.js"></script>
   </body>
 </html>

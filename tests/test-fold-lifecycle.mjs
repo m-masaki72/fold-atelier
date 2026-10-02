@@ -73,6 +73,29 @@ test('a failed restore resets the work and allows startup to finish', async () =
   assert.equal(resets, 1);
 });
 
+test('a missing saved image warns the user while restoring the work and folding state', async () => {
+  let applied, notification;
+  const session = createSessionController({
+    storage: {
+      getItem: () => JSON.stringify({ version: 1, spec: { kind: 'cat' }, fold: 0.4, imageKey: 'missing' }),
+    },
+    restoreArtwork: async () => false,
+    apply: (value) => {
+      applied = value;
+    },
+    reset() {
+      assert.fail('A missing image must not discard the saved model');
+    },
+    notify: (value) => {
+      notification = value;
+    },
+  });
+  await session.restore();
+  assert.equal(applied.spec.kind, 'cat');
+  assert.equal(applied.fold, 0.4);
+  assert.match(notification, /保存した画像は見つかりません/);
+});
+
 test('initialization failure unlocks the page and never starts playback or restores state', async () => {
   let interactive = true;
   let reported;

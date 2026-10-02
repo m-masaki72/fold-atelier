@@ -219,6 +219,37 @@ export class FoldView {
     this.onCameraChange?.();
   }
 
+  adjustCamera(action) {
+    if (!['left', 'right', 'up', 'down', 'zoom-in', 'zoom-out'].includes(action)) return;
+    this.cancelCameraMotion();
+    this.manualCamera = true;
+    this.frameGoal = null;
+    if (action.startsWith('zoom-')) {
+      this.camera.zoom = THREE.MathUtils.clamp(
+        this.camera.zoom * (action === 'zoom-in' ? 1.2 : 1 / 1.2),
+        this.controls.minZoom,
+        this.controls.maxZoom,
+      );
+    } else {
+      const offset = this.camera.position.clone().sub(this.controls.target);
+      const spherical = new THREE.Spherical().setFromVector3(offset);
+      const angle = Math.PI / 12;
+      if (action === 'left') spherical.theta -= angle;
+      if (action === 'right') spherical.theta += angle;
+      if (action === 'up') spherical.phi -= angle;
+      if (action === 'down') spherical.phi += angle;
+      spherical.phi = THREE.MathUtils.clamp(
+        spherical.phi,
+        this.controls.minPolarAngle,
+        this.controls.maxPolarAngle,
+      );
+      this.camera.position.copy(this.controls.target).add(offset.setFromSpherical(spherical));
+    }
+    this.updateFrustum();
+    this.controls.update();
+    this.onCameraChange?.();
+  }
+
   setCameraMode(mode) {
     this.cancelCameraMotion();
     this.cameraMode = mode;

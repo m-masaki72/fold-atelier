@@ -79,25 +79,55 @@ export function writeSession(value, storage) {
   }
 }
 
-// Images can exceed localStorage's quota. Keep the last image in IndexedDB and
-// store only its key in the small view-state record.
-export async function imageStore(record) {
-  const database = await new Promise((resolve, reject) => {
+function openImageDatabase() {
+  return new Promise((resolve, reject) => {
     const request = indexedDB.open('fold-atelier-images', 1);
     request.onupgradeneeded = () => request.result.createObjectStore('images');
     request.onsuccess = () => resolve(request.result);
     request.onerror = () => reject(request.error);
   });
+}
+
+// Each tab can retain its own picture without replacing another tab's saved image.
+export async function imageStore(record, key) {
+  const database = await openImageDatabase();
   try {
     return await new Promise((resolve, reject) => {
       const transaction = database.transaction('images', record ? 'readwrite' : 'readonly');
       const store = transaction.objectStore('images');
-      const request = record ? store.put(record, 'current') : store.get('current');
-      transaction.oncomplete = () => resolve(request.result);
+      const request = record ? store.put(record, record.key) : store.get(key || 'current');
+      let result;
+      request.onsuccess = () => {
+        result = request.result;
+        if (!record && key && !result) {
+          const legacy = store.get('current');
+          legacy.onsuccess = () => {
+            result = legacy.result?.key === key ? legacy.result : undefined;
+          };
+        }
+      };
+      transaction.oncomplete = () => resolve(result);
       transaction.onerror = () => reject(transaction.error);
       transaction.onabort = () => reject(transaction.error);
     });
   } finally {
     database.close();
   }
+}
+
+export async function clearSavedData(storage = localStorage) {
+  const database = await openImageDatabase();
+  try {
+    await new Promise((resolve, reject) => {
+      const transaction = database.transaction('images', 'readwrite');
+      transaction.objectStore('images').clear();
+      transaction.oncomplete = () => resolve();
+      transaction.onerror = () => reject(transaction.error);
+      transaction.onabort = () => reject(transaction.error);
+    });
+  } finally {
+    database.close();
+  }
+  storage.removeItem(SESSION_KEY);
+  storage.removeItem('fold-audio-volume');
 }

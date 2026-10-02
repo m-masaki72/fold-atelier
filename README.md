@@ -26,6 +26,8 @@ npm start
 
 選んだ作品や折り具合は、同じブラウザ・同じURLで再開できます。
 キーボードは模型を選択して、Spaceで再生・停止、左右キーで工程移動、Rで視点を戻します。
+「向き」の回転・拡大縮小ボタンも、Tabで選んでEnterで操作できます。
+保存した画像・設定を消すには、画面下の「保存データを消す」を使います。他のFOLDのタブも閉じてください。
 
 ## 試作の範囲
 
@@ -34,12 +36,17 @@ npm start
 
 ## 公開する
 
-静的サイトとして動きます。GitHub Pagesでは、このリポジトリのrootを公開してください。
-トップの `index.html` から `dist/fold.html` が開きます。`dist/` だけを公開することもできます。
+静的サイトとして動きます。GitHub Pagesでは、リポジトリの **Settings → Pages → Build and deployment → Source** を **GitHub Actions** に設定してください。
+この設定はGitHubの画面で一度変更する必要があります。`Deploy from a branch` のままでは、チェック成功前に公開される既存の経路が残ります。
+
+設定後は、`main` へのpushで `Check` の構文・Lint・整形・Node.jsテスト・E2Eが成功すると公開します。
+初回や再公開は **Actions → Check → Run workflow** で `main` を選んで実行できます。プルリクエストや他のブランチは検証だけを行います。
+公開するのは `dist/` と入口・404・サイトマップ・ライセンスです。テスト・ツール・検証画像は含めません。
+トップの `index.html` から `dist/fold.html` が開くため、公開URLは変わりません。別の静的ホストでは `dist/` だけを公開することもできます。
 
 画像はブラウザ内で読み込み・保存します。外部APIやAPIキーは使いません。
 
-favicon、共有用画像・OGP、JSON-LD、サイトマップを同梱しています。
+favicon、スマホのホーム画面用アイコン、共有用画像・OGP、JSON-LD、サイトマップを同梱しています。
 公開先を変えるときは、3つのHTMLの公開URL、JSON-LD、`sitemap.xml`、`404.html` のリンクを更新してください。
 
 ## 開発する
