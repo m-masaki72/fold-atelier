@@ -116,3 +116,32 @@ test('resume persists selected geometry, progress and camera; bad or blocked sto
   assert.equal(readSession(blocked), null);
   assert.equal(writeSession(session, blocked), false);
 });
+
+test('resume keeps the current and previous works when a long history is trimmed', () => {
+  const history = Array.from({ length: 150 }, (_, i) => `study-${String((i % 100) + 1).padStart(3, '0')}`);
+  for (const index of [0, 20, 80, 149]) {
+    const saved = validateSession({
+      version: 1,
+      spec: { kind: history[index] },
+      history,
+      historyIndex: index,
+    });
+    assert.equal(saved.history.length, 100);
+    assert.equal(saved.history[saved.historyIndex], history[index]);
+    if (index > 0) assert.equal(saved.history[saved.historyIndex - 1], history[index - 1]);
+    if (index < 149) assert.equal(saved.history[saved.historyIndex + 1], history[index + 1]);
+  }
+});
+
+test('resume adjusts the cursor when invalid history entries are removed', () => {
+  const resume = (history, historyIndex) =>
+    validateSession({ version: 1, spec: { kind: 'study-003' }, history, historyIndex });
+  const saved = resume(['study-001', 'missing', 'study-002', null, 'study-003', 'study-004'], 4);
+  assert.deepEqual(saved.history, ['study-001', 'study-002', 'study-003', 'study-004']);
+  assert.equal(saved.historyIndex, 2);
+  assert.equal(saved.history[saved.historyIndex], saved.spec.kind);
+  assert.equal(resume([], 99).historyIndex, -1);
+  assert.equal(resume(['missing'], 0).historyIndex, -1);
+  assert.equal(resume(['study-001'], 99).historyIndex, 0);
+  assert.equal(resume(['study-001'], -1).historyIndex, -1);
+});

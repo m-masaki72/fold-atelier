@@ -1,9 +1,25 @@
-import { MODEL_PRESETS, COLLECTION } from './fold-models.js';
+import { MODEL_PRESETS } from './fold-recipes.js';
+import { COLLECTION } from './fold-net-data.js';
 
 export const SESSION_KEY = 'fold-atelier-session-v1';
-const kinds = new Set([...MODEL_PRESETS, ...COLLECTION].map((entry) => entry.id));
+const collectionIds = new Set(COLLECTION.map((entry) => entry.id));
+const kinds = new Set([...MODEL_PRESETS.map((entry) => entry.id), ...collectionIds]);
 const clamp = (value, min, max, fallback) =>
   Number.isFinite(value) ? Math.max(min, Math.min(max, value)) : fallback;
+
+function normalizeHistory(value, index) {
+  const source = Array.isArray(value) ? value : [];
+  const cursor = Math.floor(clamp(index, -1, source.length - 1, -1));
+  const history = [];
+  let historyIndex = -1;
+  source.forEach((id, i) => {
+    if (!collectionIds.has(id)) return;
+    history.push(id);
+    if (i <= cursor) historyIndex = history.length - 1;
+  });
+  const start = Math.max(0, historyIndex - 99);
+  return { history: history.slice(start, start + 100), historyIndex: historyIndex - start };
+}
 
 export function validateSession(value) {
   if (value?.version !== 1 || !kinds.has(value.spec?.kind)) return null;
@@ -40,12 +56,9 @@ export function validateSession(value) {
     artMode: value.artMode === true,
     imageKey: typeof value.imageKey === 'string' ? value.imageKey.slice(0, 50) : null,
     visited: Array.isArray(value.visited)
-      ? [...new Set(value.visited.filter((id) => COLLECTION.some((e) => e.id === id)))]
+      ? [...new Set(value.visited.filter((id) => collectionIds.has(id)))]
       : [],
-    history: Array.isArray(value.history)
-      ? value.history.filter((id) => COLLECTION.some((e) => e.id === id)).slice(-100)
-      : [],
-    historyIndex: Math.floor(clamp(value.historyIndex, -1, 99, -1)),
+    ...normalizeHistory(value.history, value.historyIndex),
   };
 }
 

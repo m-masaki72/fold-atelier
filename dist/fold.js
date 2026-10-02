@@ -1,6 +1,7 @@
 import { FoldView } from './fold-view.js';
-import { MODEL_PRESETS, COLLECTION, parseModelPrompt } from './fold-models.js';
-import { STUDY_FAMILIES } from './fold-collection.js';
+import { COLLECTION } from './fold-net-data.js';
+import { createGallery } from './fold-gallery.js';
+import { createArtwork } from './fold-artwork.js';
 import { advancePlayback, END_HOLD_SECONDS, STEP_SECONDS } from './fold-sequence.js';
 import { FoldAudio, audibleFold } from './fold-audio.js';
 import { readSession, writeSession, imageStore } from './fold-session.js';
@@ -29,22 +30,20 @@ const state = {
 };
 let view,
   animation = null,
-  previousTime = 0,
-  uploadURL = null,
-  generatedURL = null,
-  generationAvailable = false;
+  previousTime = 0;
+let artwork;
+const gallery = createGallery({
+  state,
+  setModel,
+  setTouring,
+  setPlaying,
+  closeTools,
+  toast,
+  reducedMotion,
+});
 let playback = { progress: state.fold, direction: 1, hold: 1.1 };
-let tourElapsed = 0,
-  historyIndex = -1;
+let tourElapsed = 0;
 let lastSaved = '';
-const visited = new Set(),
-  history = [];
-const shuffled = [...COLLECTION];
-for (let i = shuffled.length - 1; i > 0; i--) {
-  const j = Math.floor(Math.random() * (i + 1));
-  [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
-}
-
 function setTouring(value) {
   state.touring = value;
   tourElapsed = 0;
@@ -59,7 +58,12 @@ function setTouring(value) {
 }
 
 function updatePlayState() {
-  const label = playbackLabel({ ...state, ...playback, animation, settling: view?.cameraSettling });
+  const label = playbackLabel({
+    ...state,
+    ...playback,
+    animation,
+    settling: view?.cameraSettling,
+  });
   if ($('#play-state').textContent !== label) $('#play-state').textContent = label;
   const active = state.playing || !!animation;
   if ($('#play').getAttribute('aria-pressed') !== String(active)) {
@@ -85,7 +89,11 @@ function openTools(name) {
     section.classList.toggle('selected-tool', section.id === `tool-${name}`);
     if (section.tagName === 'DETAILS' && section.id === `tool-${name}`) section.open = true;
   });
-  $('#tools-title').textContent = { works: '作品を選ぶ', paper: '紙と絵', prompt: 'ことばで作る' }[name];
+  $('#tools-title').textContent = {
+    works: '作品を選ぶ',
+    paper: '紙と絵',
+    prompt: 'ことばで作る',
+  }[name];
   $('#tools-body').append(content);
   $('#tools-dialog').showModal();
 }
@@ -104,9 +112,7 @@ function saveSession() {
     artMode: state.artMode,
     imageKey: state.imageKey,
     family: $('#collection-family').value,
-    visited: [...visited],
-    history,
-    historyIndex,
+    ...gallery.snapshot(),
   };
   const serialized = JSON.stringify(value);
   if (serialized === lastSaved) return;
@@ -128,14 +134,7 @@ async function restoreSession() {
     if (savedSession.imageKey) {
       const image = await imageStore().catch(() => null);
       if (image?.key === savedSession.imageKey) {
-        uploadURL = URL.createObjectURL(image.blob);
-        await view.setImage(uploadURL);
-        state.imageSource = uploadURL;
-        state.imageKey = image.key;
-        state.artwork = image.title;
-        $('#art-thumbnail').src = $('#source-image').src = uploadURL;
-        $('#art-title').textContent = image.title;
-        $('#art-credit').textContent = image.credit;
+        await artwork.restore(image);
       }
     }
     setArtMode(savedSession.artMode && (!savedSession.imageKey || !!state.imageKey));
@@ -144,53 +143,13 @@ async function restoreSession() {
     if (savedSession.camera?.manual) view.restoreCamera(savedSession.camera);
     setPlaying(savedSession.playing && !reducedMotion);
     playback.direction = savedSession.direction;
-    savedSession.visited.forEach((id) => visited.add(id));
-    history.push(...savedSession.history);
-    historyIndex = Math.min(savedSession.historyIndex, history.length - 1);
-    $('#collection-prev').disabled = historyIndex < 1;
-    $('#collection-count').textContent = visited.size ? `${visited.size} / ${COLLECTION.length}` : '100点';
-    const entry = COLLECTION.find((item) => item.id === state.model);
-    if (entry) {
-      $('#collection-current').textContent = `${entry.label} · ${entry.faces}面 · つながる一枚`;
-      $(`[data-study="${entry.id}"]`).setAttribute('aria-pressed', 'true');
-    }
+    gallery.restore(savedSession);
     updateFocusControl();
     toast('前回の作品と折り具合を再開しました。');
   } catch {
     setModel({ kind: 'person' });
     toast('前回の状態を読み込めなかったため、最初の作品を開きました。');
   }
-}
-
-function showStudy(entry, remember = true) {
-  setModel({ kind: entry.id });
-  visited.add(entry.id);
-  if (remember) {
-    history.splice(historyIndex + 1);
-    history.push(entry.id);
-    historyIndex = history.length - 1;
-  }
-  $('#collection-prev').disabled = historyIndex < 1;
-  $('#collection-count').textContent = `${visited.size} / ${COLLECTION.length}`;
-  $('#collection-current').textContent = `${entry.label} · ${entry.faces}面 · つながる一枚`;
-  document
-    .querySelectorAll('[data-study]')
-    .forEach((button) => button.setAttribute('aria-pressed', String(button.dataset.study === entry.id)));
-}
-
-function nextStudy() {
-  let entry = shuffled.find((item) => !visited.has(item.id));
-  if (!entry) {
-    if (state.touring) {
-      setTouring(false);
-      setPlaying(false);
-      toast('100点の旅が終わりました。気になる形をもう一度。');
-      return;
-    }
-    visited.clear();
-    entry = shuffled.find((item) => item.id !== state.model) || shuffled[0];
-  }
-  if (entry) showStudy(entry);
 }
 
 function toast(message) {
@@ -276,7 +235,13 @@ function replayStep() {
   playback.direction = 1;
   view.setReviewStep(plan.index);
   setFold(reducedMotion ? plan.to : plan.from);
-  if (!reducedMotion) animation = { ...plan, kind: 'replay', elapsed: 0, duration: STEP_SECONDS * 1000 };
+  if (!reducedMotion)
+    animation = {
+      ...plan,
+      kind: 'replay',
+      elapsed: 0,
+      duration: STEP_SECONDS * 1000,
+    };
   updatePlayState();
 }
 
@@ -302,8 +267,7 @@ function setModel(spec, animate = true) {
   preview.setModel(view.model);
   $('#model-title').textContent = view.model.label;
   state.model = spec.kind;
-  if (!COLLECTION.some((entry) => entry.id === spec.kind))
-    $('#collection-current').textContent = '凹凸のある立体が、すべて一枚の紙へ。';
+  gallery.reflectModel(spec.kind);
   $('#model-select').value = spec.kind;
   setArtMode(false);
   setFold(animate && !reducedMotion ? 0 : 1);
@@ -320,178 +284,6 @@ function setModel(spec, animate = true) {
   $('#model-status').textContent = `${variation}。${view.model.faces.length}面が一枚につながる展開図です。`;
 }
 
-async function generateModel(event) {
-  event?.preventDefault();
-  if (state.modelGenerating) return;
-  setTouring(false);
-  const prompt = $('#model-prompt').value;
-  const spec = parseModelPrompt(prompt);
-  if (!spec) {
-    $('#model-status').textContent =
-      'まだその形は用意していません。人・ロボット・ねこ・家・ロケット・お城、または多面体を試してください。';
-    $('#model-prompt').focus();
-    return;
-  }
-  state.modelGenerating = true;
-  $('#model-generate').disabled = true;
-  $('#model-select').disabled = true;
-  document.querySelectorAll('[data-prompt]').forEach((button) => {
-    button.disabled = true;
-  });
-  document
-    .querySelectorAll('.collection-controls button, #collection-open, [data-study]')
-    .forEach((button) => {
-      button.disabled = true;
-    });
-  $('#model-status').textContent = '外側の面をつないで、一枚の展開図を作っています…';
-  await new Promise((resolve) => setTimeout(resolve, reducedMotion ? 0 : 450));
-  try {
-    setModel(spec);
-    closeTools();
-  } catch {
-    $('#model-status').textContent = 'その形の展開図を作れませんでした。別の形を試してください。';
-  } finally {
-    state.modelGenerating = false;
-    $('#model-generate').disabled = false;
-    $('#model-select').disabled = false;
-    document.querySelectorAll('[data-prompt]').forEach((button) => {
-      button.disabled = false;
-    });
-    document
-      .querySelectorAll('.collection-controls button, #collection-open, [data-study]')
-      .forEach((button) => {
-        button.disabled = false;
-      });
-    $('#collection-prev').disabled = historyIndex < 1;
-  }
-}
-
-async function applyImage(source, title, credit) {
-  const applied = await view.setImage(source);
-  if (!applied) return;
-  state.artwork = title;
-  state.imageSource = source;
-  state.imageKey = null;
-  $('#art-thumbnail').src = source;
-  $('#art-thumbnail').alt = title;
-  $('#source-image').src = source;
-  $('#art-title').textContent = title;
-  $('#art-credit').textContent = credit;
-  setArtMode(true);
-  $('#art-dialog').close();
-  goTo(0.58);
-  view.home();
-  closeTools();
-  if (source.startsWith('blob:')) {
-    try {
-      const key = `image-${Date.now()}`;
-      const blob = await (await fetch(source)).blob();
-      await imageStore({ key, blob, title, credit });
-      if (state.imageSource === source) state.imageKey = key;
-    } catch {
-      toast('絵を表示しました。画像の次回復元は、このブラウザでは利用できません。');
-    }
-  }
-  saveSession();
-}
-
-function busy(value) {
-  state.generating = value;
-  $('#art-dialog').classList.toggle('busy', value);
-  $('#generate').disabled = value || !generationAvailable;
-  $('#art-prompt').disabled = value;
-  $('#image-upload').disabled = value;
-  $('#restore-art').disabled = value;
-}
-
-async function generate(event) {
-  event.preventDefault();
-  const prompt = $('#art-prompt').value.trim();
-  if (!prompt) {
-    $('#art-prompt').focus();
-    return;
-  }
-  busy(true);
-  $('#generation-status').textContent = '絵を描いています。そのまま紙を眺めながらお待ちください。';
-  const timeout = new AbortController();
-  const timer = setTimeout(() => timeout.abort(), 190000);
-  try {
-    const response = await fetch('/api/fold/generate', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ prompt }),
-      signal: timeout.signal,
-    });
-    const payload = await response.json();
-    if (!response.ok) throw new Error(payload.error || '絵を生成できませんでした。');
-    const blob = await (await fetch(`data:image/png;base64,${payload.image}`)).blob();
-    const nextURL = URL.createObjectURL(blob);
-    try {
-      await applyImage(nextURL, prompt.slice(0, 32), 'IMAGEGEN · CREATED JUST NOW');
-    } catch (error) {
-      URL.revokeObjectURL(nextURL);
-      throw error;
-    }
-    if (generatedURL) URL.revokeObjectURL(generatedURL);
-    generatedURL = nextURL;
-    $('#generation-status').textContent = '新しい絵を紙にのせました。';
-    toast(`新しい絵を、${view.model.faces.length}面につなぎました。`);
-  } catch (error) {
-    $('#generation-status').textContent =
-      error.name === 'AbortError'
-        ? '生成に時間がかかっています。しばらくしてから再度お試しください。'
-        : error.message;
-  } finally {
-    clearTimeout(timer);
-    busy(false);
-  }
-}
-
-async function upload(event) {
-  const file = event.target.files[0];
-  event.target.value = '';
-  if (!file) return;
-  if (!['image/png', 'image/jpeg', 'image/webp'].includes(file.type) || file.size > 10 * 1024 * 1024) {
-    toast('10 MB以下の JPG・PNG・WebP を選んでください。');
-    return;
-  }
-  const url = URL.createObjectURL(file);
-  try {
-    const image = new Image();
-    image.src = url;
-    await image.decode();
-    if (image.width * image.height > 40000000) throw new Error('画像のサイズが大きすぎます。');
-    const canvas = document.createElement('canvas');
-    canvas.width = canvas.height = 1536;
-    const context = canvas.getContext('2d');
-    context.fillStyle = '#efece4';
-    context.fillRect(0, 0, 1536, 1536);
-    const scale = 1536 / Math.max(image.width, image.height);
-    context.drawImage(
-      image,
-      (1536 - image.width * scale) / 2,
-      (1536 - image.height * scale) / 2,
-      image.width * scale,
-      image.height * scale,
-    );
-    const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/png'));
-    const nextURL = URL.createObjectURL(blob);
-    try {
-      await applyImage(nextURL, file.name.replace(/\.[^.]+$/, '').slice(0, 32), 'YOUR PICTURE · ON PAPER');
-    } catch (error) {
-      URL.revokeObjectURL(nextURL);
-      throw error;
-    }
-    if (uploadURL) URL.revokeObjectURL(uploadURL);
-    uploadURL = nextURL;
-    toast('あなたの絵を、紙にのせました。');
-  } catch {
-    toast('画像を読み込めませんでした。別の画像でお試しください。');
-  } finally {
-    URL.revokeObjectURL(url);
-  }
-}
-
 function frame(now) {
   const dt = previousTime ? Math.min((now - previousTime) / 1000, 0.05) : 0;
   previousTime = now;
@@ -502,7 +294,7 @@ function frame(now) {
       tourElapsed += dt;
       if (tourElapsed >= END_HOLD_SECONDS) {
         tourElapsed = 0;
-        nextStudy();
+        gallery.next();
       }
     }
     const before = state.fold;
@@ -510,7 +302,7 @@ function frame(now) {
     if (state.playing && !view.cameraSettling) {
       playback = advancePlayback(playback, dt, view.model.sequence, state.touring);
       if (playback.progress !== state.fold) setFold(playback.progress);
-      if (playback.nextModel) nextStudy();
+      if (playback.nextModel) gallery.next();
     } else if (animation && !view.cameraSettling) {
       animation.elapsed += dt * 1000;
       const t = Math.min(1, animation.elapsed / animation.duration);
@@ -553,112 +345,16 @@ async function init() {
     ['#step-next', 1],
   ])
     $(selector).addEventListener('click', () => stepFold(direction));
-  for (const preset of MODEL_PRESETS) {
-    const option = document.createElement('option');
-    option.value = preset.id;
-    option.textContent = preset.label;
-    $('#model-select').append(option);
-  }
-  const studies = document.createElement('optgroup');
-  studies.label = '100の立体コレクション';
-  for (const entry of COLLECTION) {
-    const option = document.createElement('option');
-    option.value = entry.id;
-    option.textContent = entry.label;
-    studies.append(option);
-    const card = document.createElement('button');
-    card.className = 'study-card';
-    card.dataset.study = entry.id;
-    card.dataset.family = entry.family;
-    card.setAttribute('aria-pressed', 'false');
-    const img = document.createElement('img');
-    img.src = entry.thumbnail;
-    img.alt = '';
-    img.loading = 'lazy';
-    img.width = 220;
-    img.height = 210;
-    const title = document.createElement('strong');
-    title.textContent = entry.label;
-    const detail = document.createElement('span');
-    detail.textContent = `${entry.id.slice(-3)} / ${entry.faces}面・一枚`;
-    card.append(img, title, detail);
-    card.addEventListener('click', () => {
-      setTouring(false);
-      showStudy(entry);
-      $('#collection-dialog').close();
-    });
-    $('#collection-grid').append(card);
-  }
-  $('#model-select').append(studies);
-  // Show different families together, so the first screen conveys the range.
-  for (let variation = 0; variation < 10; variation++)
-    COLLECTION.filter((_, index) => index % 10 === variation).forEach((entry) =>
-      $('#collection-grid').append($(`[data-study="${entry.id}"]`)),
-    );
-  STUDY_FAMILIES.forEach((name, i) => {
-    const option = document.createElement('option');
-    option.value = i;
-    option.textContent = name;
-    $('#collection-family').append(option);
+  artwork = createArtwork({
+    view,
+    state,
+    setArtMode,
+    goTo,
+    closeTools,
+    toast,
+    saveSession,
   });
-  $('#collection-family').addEventListener('change', () => {
-    const family = $('#collection-family').value;
-    let count = 0;
-    document.querySelectorAll('[data-study]').forEach((card) => {
-      card.hidden = family !== 'all' && card.dataset.family !== family;
-      if (!card.hidden) count++;
-    });
-    $('#collection-results').textContent = `${count}点`;
-  });
-  $('#collection-open').addEventListener('click', () => {
-    setTouring(false);
-    closeTools();
-    $('#collection-dialog').showModal();
-  });
-  $('#collection-next').addEventListener('click', () => {
-    setTouring(false);
-    nextStudy();
-    closeTools();
-  });
-  $('#collection-prev').disabled = true;
-  $('#collection-prev').addEventListener('click', () => {
-    if (historyIndex < 1) return;
-    setTouring(false);
-    historyIndex--;
-    showStudy(
-      COLLECTION.find((item) => item.id === history[historyIndex]),
-      false,
-    );
-    closeTools();
-  });
-  $('#collection-tour').addEventListener('click', () => {
-    const start = !state.touring;
-    if (start && visited.size === COLLECTION.length) visited.clear();
-    if (start && !COLLECTION.some((item) => item.id === state.model)) nextStudy();
-    setTouring(start);
-    closeTools();
-  });
-  $('#model-select').value = state.model;
-  $('#model-select').addEventListener('change', () => {
-    setTouring(false);
-    const entry = COLLECTION.find((item) => item.id === $('#model-select').value);
-    if (entry) {
-      showStudy(entry);
-      closeTools();
-      return;
-    }
-    const preset = MODEL_PRESETS.find((item) => item.id === $('#model-select').value);
-    $('#model-prompt').value = preset.prompt;
-    setModel(parseModelPrompt(preset.prompt));
-    closeTools();
-  });
-  $('#model-form').addEventListener('submit', generateModel);
-  document.querySelectorAll('[data-prompt]').forEach((button) =>
-    button.addEventListener('click', () => {
-      $('#model-prompt').value = button.dataset.prompt;
-      generateModel();
-    }),
-  );
+  gallery.init();
   $('#art-mode').addEventListener('click', () => setArtMode(!state.artMode));
   document.querySelectorAll('[data-fold]').forEach((button) =>
     button.addEventListener('click', () => {
@@ -714,15 +410,6 @@ async function init() {
       updateFocusControl();
     }
   });
-  $('#art-open').addEventListener('click', () => $('#art-dialog').showModal());
-  $('#source-open').addEventListener('click', () => $('#source-dialog').showModal());
-  $('#restore-art').addEventListener('click', () =>
-    applyImage('./images/fold/crane.png', '日輪をわたる', 'IMAGEGEN · ORIGINAL ARTWORK').catch(() =>
-      toast('元の絵を読み込めませんでした。'),
-    ),
-  );
-  $('#image-upload').addEventListener('change', upload);
-  $('#generate-form').addEventListener('submit', generate);
   document
     .querySelectorAll('[data-tool]')
     .forEach((button) => button.addEventListener('click', () => openTools(button.dataset.tool)));
@@ -770,18 +457,7 @@ async function init() {
     setTimeout(() => URL.revokeObjectURL(link.href), 5000);
     toast('この瞬間を保存しました。');
   });
-  try {
-    const response = await fetch('/api/fold/config');
-    if (!response.ok) throw new Error();
-    const config = await response.json();
-    generationAvailable = config.generationAvailable === true;
-  } catch {
-    generationAvailable = false;
-  }
-  busy(false);
-  $('#generation-status').textContent = generationAvailable
-    ? '描いた絵を、その場で立体の面へ。生成には少し時間がかかります。'
-    : '画像生成は未接続です。いまは手元の画像か、この作品の絵で楽しめます。';
+  await artwork.init();
   await restoreSession();
   state.ready = true;
   requestAnimationFrame(frame);
@@ -791,7 +467,7 @@ async function init() {
     snapshot: () => ({
       ...state,
       imageSource: state.imageSource.startsWith('blob:') ? 'local-image' : state.imageSource,
-      generationAvailable,
+      generationAvailable: artwork.generationAvailable,
       animating: !!animation,
       camera: view.camera.position.toArray(),
       target: view.controls.target.toArray(),
@@ -814,7 +490,7 @@ async function init() {
       foldSteps: view.model.sequence.count,
       foldStep: view.model.sequence.sample(state.fold).index + 1,
       collectionSize: COLLECTION.length,
-      collectionVisited: visited.size,
+      collectionVisited: gallery.snapshot().visited.length,
       faces: view.model.faces.length,
       modelSpec: view.model.spec,
       geometryCount: view.renderer.info.memory.geometries,

@@ -93,34 +93,34 @@ for (let family = 0; family < STUDY_FAMILIES.length; family++) {
   for (let seed = previous.length ? previous.at(-1).seed + 1 : 0; count < 10 && seed < 160; seed++) {
     const start = performance.now(),
       spec = { kind: 'study', family, seed };
+    let model;
     try {
       auditSurface(exteriorSurface(recipe(spec), convexFaces));
-      const model = buildPaperModel(spec);
+      model = buildPaperModel(spec);
       auditNet(model);
-      const number = entries.length + 1,
-        id = `study-${String(number).padStart(3, '0')}`;
-      const entry = {
-        id,
-        family,
-        seed,
-        label: `${STUDY_FAMILIES[family]} ${String(count + 1).padStart(2, '0')}`,
-        faces: model.faces.length,
-        thumbnail: `./images/fold/collection/${id}.svg`,
-      };
-      entries.push(entry);
-      nets[id] = serialize(model);
-      count++;
-      await writeFile(new URL(`${id}.svg`, output), thumbnail(model));
-      console.log(
-        `${number}/100 ${entry.label} ${entry.faces}面 ${(performance.now() - start).toFixed(0)}ms`,
-      );
-      await writeFile(
-        new URL('./qa/fold/collection-progress.json', import.meta.url),
-        JSON.stringify({ entries, nets }, null, 2),
-      );
     } catch (error) {
       console.log(`skip family=${family} seed=${seed}: ${error.message}`);
+      continue;
     }
+    const number = entries.length + 1,
+      id = `study-${String(number).padStart(3, '0')}`;
+    const entry = {
+      id,
+      family,
+      seed,
+      label: `${STUDY_FAMILIES[family]} ${String(count + 1).padStart(2, '0')}`,
+      faces: model.faces.length,
+      thumbnail: `./images/fold/collection/${id}.svg`,
+    };
+    entries.push(entry);
+    nets[id] = serialize(model);
+    count++;
+    await writeFile(new URL(`${id}.svg`, output), thumbnail(model));
+    console.log(`${number}/100 ${entry.label} ${entry.faces}面 ${(performance.now() - start).toFixed(0)}ms`);
+    await writeFile(
+      new URL('./qa/fold/collection-progress.json', import.meta.url),
+      JSON.stringify({ entries, nets }, null, 2),
+    );
   }
   if (count < 10) throw new Error(`Only ${count} models in ${STUDY_FAMILIES[family]}`);
 }

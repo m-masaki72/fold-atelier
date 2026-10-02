@@ -7,5 +7,14 @@ __pycache__/
 !.env.example
 *.pem
 *.key
+.ssh/
+.aws/
+id_rsa*
+id_ed25519*
+*.log
+coverage/
+.venv/
+.idea/
+.vscode/
 qa/fold/backups/
 qa/fold/collection-progress.json

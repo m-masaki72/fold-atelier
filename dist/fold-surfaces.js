@@ -107,3 +107,28 @@ export function createPaperSurface(color, pattern) {
   material.color.set('#ffffff');
   return material;
 }
+
+export function createGroundShadow() {
+  const shadowCanvas = document.createElement('canvas');
+  shadowCanvas.width = shadowCanvas.height = 128;
+  const shadowContext = shadowCanvas.getContext('2d');
+  const gradient = shadowContext.createRadialGradient(64, 64, 0, 64, 64, 64);
+  gradient.addColorStop(0, '#ffffff');
+  gradient.addColorStop(0.35, '#ffffff88');
+  gradient.addColorStop(1, '#ffffff00');
+  shadowContext.fillStyle = gradient;
+  shadowContext.fillRect(0, 0, 128, 128);
+  const shadow = new THREE.Mesh(
+    new THREE.PlaneGeometry(1, 1),
+    new THREE.MeshBasicMaterial({
+      color: '#516259',
+      map: new THREE.CanvasTexture(shadowCanvas),
+      transparent: true,
+      opacity: 0.085,
+      depthWrite: false,
+      toneMapped: false,
+    }),
+  );
+  shadow.rotation.x = -Math.PI / 2;
+  return shadow;
+}
