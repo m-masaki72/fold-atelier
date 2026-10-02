@@ -23,6 +23,7 @@ export function createArtwork({ view, state, setArtMode, goTo, closeTools, toast
     state.artwork = title;
     state.imageSource = source;
     state.imageKey = imageKey;
+    state.imageReady = true;
     $('#art-thumbnail').src = source;
     $('#art-thumbnail').alt = title;
     $('#source-image').src = source;

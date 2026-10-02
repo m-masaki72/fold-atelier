@@ -55,6 +55,7 @@ export function audibleFold(sequence, from, to) {
 export class FoldAudio {
   constructor() {
     this.enabled = false;
+    this.enableRequest = 0;
     this.visible = true;
     this.volumes = { bgm: 0.32, se: 0.55 };
     this.buffers = new Map();
@@ -95,14 +96,18 @@ export class FoldAudio {
   }
 
   async setEnabled(enabled) {
+    const request = ++this.enableRequest;
     this.enabled = enabled;
     if (enabled) {
       try {
         if (!this.context) this.createContext();
         await this.context.resume();
+        if (request !== this.enableRequest) return;
         if (this.context.state !== 'running') throw new Error('Audio did not start');
       } catch (error) {
+        if (request !== this.enableRequest) return;
         this.enabled = false;
+        this.sync();
         throw error;
       }
     }

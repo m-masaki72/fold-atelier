@@ -21,6 +21,7 @@ const state = {
   paper: 'washi',
   artwork: '日輪をわたる',
   imageSource: './images/fold/crane.png',
+  imageReady: false,
   model: 'person',
   modelGenerating: false,
   artMode: false,
@@ -247,8 +248,10 @@ function stepFold(direction) {
 }
 
 function setArtMode(enabled) {
+  enabled = enabled && state.imageReady;
   state.artMode = enabled;
   view.setArtMode(enabled);
+  $('#art-mode').disabled = !state.imageReady;
   $('#art-mode').setAttribute('aria-pressed', String(enabled));
   $('#art-mode').textContent = enabled ? '元の色にもどす ↗' : 'この絵をのせる ↗';
   $('#align-view').firstChild.textContent = enabled ? '絵がつながる視点 ' : '完成した姿を見る ';
@@ -317,7 +320,11 @@ async function initializeView() {
   view = new FoldView($('#fold-viewport'));
   preview.setModel(view.model);
   view.onCameraChange = updateFocusControl;
-  await view.setImage(state.imageSource);
+  try {
+    state.imageReady = await view.setImage(state.imageSource);
+  } catch {
+    toast('元の絵を読み込めませんでした。紙の立体はそのまま遊べます。「絵を変える」から別の画像を選べます。');
+  }
   setFold(state.fold);
   setArtMode(false);
   setPlaying(!reducedMotion);
@@ -388,6 +395,11 @@ function bindControls() {
     if (mobile.matches) $('.view-menu').open = false;
   });
   $('#fold-viewport').addEventListener('keydown', (event) => {
+    if (event.ctrlKey || event.altKey || event.metaKey) return;
+    if (event.repeat) {
+      if (['Space', 'ArrowLeft', 'ArrowRight'].includes(event.code)) event.preventDefault();
+      return;
+    }
     if (event.code === 'Space') {
       setTouring(false);
       event.preventDefault();
@@ -437,17 +449,22 @@ function bindControls() {
     sound.setVisible(false);
   });
   $('#capture').addEventListener('click', async () => {
-    const image = await view.capture();
-    if (!image) {
+    const filename = `fold-${Math.round(state.fold * 100)}.png`;
+    let source;
+    try {
+      const image = await view.capture();
+      if (!image) throw new Error('PNG encoding failed');
+      const link = document.createElement('a');
+      link.download = filename;
+      source = URL.createObjectURL(image);
+      link.href = source;
+      link.click();
+      setTimeout(() => URL.revokeObjectURL(source), 5000);
+      toast('この瞬間を保存しました。');
+    } catch {
+      if (source) URL.revokeObjectURL(source);
       toast('画像を保存できませんでした。');
-      return;
     }
-    const link = document.createElement('a');
-    link.download = `fold-${Math.round(state.fold * 100)}.png`;
-    link.href = URL.createObjectURL(image);
-    link.click();
-    setTimeout(() => URL.revokeObjectURL(link.href), 5000);
-    toast('この瞬間を保存しました。');
   });
   artwork.init();
 }
