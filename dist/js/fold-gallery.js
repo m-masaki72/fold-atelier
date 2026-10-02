@@ -1,13 +1,13 @@
 import { MODEL_PRESETS, parseModelPrompt } from './fold-recipes.js';
 import { COLLECTION } from './fold-net-data.js';
 import { STUDY_FAMILIES } from './fold-collection.js';
+import { createCollectionHistory } from './fold-history.js';
 
 const $ = (selector) => document.querySelector(selector);
 
 export function createGallery({ state, setModel, setTouring, setPlaying, closeTools, toast, reducedMotion }) {
-  let historyIndex = -1;
-  const visited = new Set(),
-    history = [];
+  const history = createCollectionHistory();
+  const visited = history.visited;
   const shuffled = [...COLLECTION];
   for (let i = shuffled.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
@@ -17,16 +17,13 @@ export function createGallery({ state, setModel, setTouring, setPlaying, closeTo
   function showStudy(entry, remember = true) {
     setModel({ kind: entry.id });
     visited.add(entry.id);
-    if (remember) {
-      history.splice(historyIndex + 1);
-      history.push(entry.id);
-      historyIndex = history.length - 1;
-    }
-    $('#collection-prev').disabled = historyIndex < 1;
+    if (remember) history.record(entry.id);
+    $('#collection-prev').disabled = !history.canGoBack(state.model);
     $('#collection-count').textContent = `${visited.size} / ${COLLECTION.length}`;
   }
 
   function reflectModel(id) {
+    $('#collection-prev').disabled = state.modelGenerating || !history.canGoBack(id);
     const entry = COLLECTION.find((item) => item.id === id);
     $('#collection-current').textContent = entry
       ? `${entry.label} · ${entry.faces}面 · つながる一枚`
@@ -60,7 +57,7 @@ export function createGallery({ state, setModel, setTouring, setPlaying, closeTo
       .forEach((control) => {
         control.disabled = value;
       });
-    $('#collection-prev').disabled = value || historyIndex < 1;
+    $('#collection-prev').disabled = value || !history.canGoBack(state.model);
   }
 
   async function generateModel(event) {
@@ -157,11 +154,11 @@ export function createGallery({ state, setModel, setTouring, setPlaying, closeTo
     });
     $('#collection-prev').disabled = true;
     $('#collection-prev').addEventListener('click', () => {
-      if (historyIndex < 1) return;
+      const id = history.previous(state.model);
+      if (!id) return;
       setTouring(false);
-      historyIndex--;
       showStudy(
-        COLLECTION.find((item) => item.id === history[historyIndex]),
+        COLLECTION.find((item) => item.id === id),
         false,
       );
       closeTools();
@@ -196,10 +193,7 @@ export function createGallery({ state, setModel, setTouring, setPlaying, closeTo
     );
   }
   function restore(saved) {
-    saved.visited.forEach((id) => visited.add(id));
-    history.push(...saved.history);
-    historyIndex = Math.min(saved.historyIndex, history.length - 1);
-    $('#collection-prev').disabled = historyIndex < 1;
+    history.restore(saved);
     $('#collection-count').textContent = visited.size ? `${visited.size} / ${COLLECTION.length}` : '100点';
     reflectModel(state.model);
   }
@@ -208,10 +202,6 @@ export function createGallery({ state, setModel, setTouring, setPlaying, closeTo
     restore,
     reflectModel,
     next: nextStudy,
-    snapshot: () => ({
-      visited: [...visited],
-      history: [...history],
-      historyIndex,
-    }),
+    snapshot: history.snapshot,
   };
 }

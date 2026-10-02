@@ -4,7 +4,8 @@ import { createGallery } from './fold-gallery.js';
 import { createArtwork } from './fold-artwork.js';
 import { advancePlayback, END_HOLD_SECONDS, STEP_SECONDS } from './fold-sequence.js';
 import { FoldAudio, audibleFold } from './fold-audio.js';
-import { readSession, writeSession, imageStore } from './fold-session.js';
+import { imageStore } from './fold-session.js';
+import { createSessionController, startApp } from './fold-lifecycle.js';
 import { CompletedPreview, stepReplayPlan, playbackLabel } from './fold-guidance.js';
 
 const $ = (selector) => document.querySelector(selector);
@@ -12,7 +13,6 @@ const range = $('#fold-range');
 const preview = new CompletedPreview([$('#completed-mini'), $('#completed-large')]);
 const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const sound = new FoldAudio();
-const savedSession = readSession();
 const mobile = matchMedia('(max-width: 959px)');
 const state = {
   ready: false,
@@ -42,7 +42,21 @@ const gallery = createGallery({
 });
 let playback = { progress: state.fold, direction: 1, hold: 1.1 };
 let tourElapsed = 0;
-let lastSaved = '';
+const session = createSessionController({
+  snapshot: snapshotSession,
+  apply: applySession,
+  restoreArtwork: async (key) => {
+    if (!key) return;
+    const image = await imageStore().catch(() => null);
+    if (image?.key === key) await artwork.restore(image);
+  },
+  reset: () => setModel({ kind: 'person' }),
+  onSave: (success) => {
+    $('#save-status').textContent = success ? 'このブラウザに自動保存済み' : 'このブラウザでは保存できません';
+  },
+  notify: toast,
+});
+const saveSession = session.save;
 function setTouring(value) {
   state.touring = value;
   tourElapsed = 0;
@@ -97,9 +111,9 @@ function openTools(name) {
   $('#tools-dialog').showModal();
 }
 
-function saveSession() {
-  if (!state.ready) return;
-  const value = {
+function snapshotSession() {
+  if (!state.ready) return null;
+  return {
     spec: view.model.spec,
     fold: state.fold,
     playing: state.playing,
@@ -113,42 +127,24 @@ function saveSession() {
     family: $('#collection-family').value,
     ...gallery.snapshot(),
   };
-  const serialized = JSON.stringify(value);
-  if (serialized === lastSaved) return;
-  const saved = writeSession(value);
-  $('#save-status').textContent = saved ? 'このブラウザに自動保存済み' : 'このブラウザでは保存できません';
-  if (saved) lastSaved = serialized;
 }
 
-async function restoreSession() {
-  if (!savedSession) return;
-  try {
-    setModel(savedSession.spec, false);
-    $('#model-prompt').value = savedSession.prompt;
-    $('#collection-family').value = savedSession.family;
-    $('#collection-family').dispatchEvent(new Event('change'));
-    state.paper = savedSession.paper;
-    view.setPaper(state.paper);
-    $(`input[name="paper"][value="${state.paper}"]`).checked = true;
-    if (savedSession.imageKey) {
-      const image = await imageStore().catch(() => null);
-      if (image?.key === savedSession.imageKey) {
-        await artwork.restore(image);
-      }
-    }
-    setArtMode(savedSession.artMode && (!savedSession.imageKey || !!state.imageKey));
-    setFold(savedSession.fold);
-    view.setCameraMode(savedSession.cameraMode);
-    if (savedSession.camera?.manual) view.restoreCamera(savedSession.camera);
-    setPlaying(savedSession.playing && !reducedMotion);
-    playback.direction = savedSession.direction;
-    gallery.restore(savedSession);
-    updateFocusControl();
-    toast('前回の作品と折り具合を再開しました。');
-  } catch {
-    setModel({ kind: 'person' });
-    toast('前回の状態を読み込めなかったため、最初の作品を開きました。');
-  }
+function applySession(saved) {
+  setModel(saved.spec, false);
+  $('#model-prompt').value = saved.prompt;
+  $('#collection-family').value = saved.family;
+  $('#collection-family').dispatchEvent(new Event('change'));
+  state.paper = saved.paper;
+  view.setPaper(state.paper);
+  $(`input[name="paper"][value="${state.paper}"]`).checked = true;
+  setArtMode(saved.artMode && (!saved.imageKey || !!state.imageKey));
+  setFold(saved.fold);
+  view.setCameraMode(saved.cameraMode);
+  if (saved.camera?.manual) view.restoreCamera(saved.camera);
+  setPlaying(saved.playing && !reducedMotion);
+  playback.direction = saved.direction;
+  gallery.restore(saved);
+  updateFocusControl();
 }
 
 function toast(message) {
@@ -317,20 +313,17 @@ function frame(now) {
   requestAnimationFrame(frame);
 }
 
-async function init() {
-  try {
-    view = new FoldView($('#fold-viewport'));
-    preview.setModel(view.model);
-    view.onCameraChange = updateFocusControl;
-    await view.setImage(state.imageSource);
-    setFold(state.fold);
-    setArtMode(false);
-    setPlaying(!reducedMotion);
-    $('#loading').hidden = true;
-  } catch {
-    $('#loading').textContent = '3D表示を開始できませんでした。WebGL対応ブラウザで再読み込みしてください。';
-    return;
-  }
+async function initializeView() {
+  view = new FoldView($('#fold-viewport'));
+  preview.setModel(view.model);
+  view.onCameraChange = updateFocusControl;
+  await view.setImage(state.imageSource);
+  setFold(state.fold);
+  setArtMode(false);
+  setPlaying(!reducedMotion);
+}
+
+function bindControls() {
   range.addEventListener('input', () => {
     setTouring(false);
     setPlaying(false);
@@ -457,8 +450,11 @@ async function init() {
     toast('この瞬間を保存しました。');
   });
   artwork.init();
-  await restoreSession();
+}
+
+function activate() {
   state.ready = true;
+  $('#loading').hidden = true;
   requestAnimationFrame(frame);
   saveSession();
   setInterval(saveSession, 1500);
@@ -504,4 +500,18 @@ async function init() {
   };
 }
 
-init();
+startApp({
+  setInteractive: (enabled) => {
+    document.body.inert = !enabled;
+  },
+  initialize: async () => {
+    await initializeView();
+    bindControls();
+  },
+  restore: session.restore,
+  activate,
+  onError: () => {
+    $('#loading').hidden = false;
+    $('#loading').textContent = '3D表示を開始できませんでした。WebGL対応ブラウザで再読み込みしてください。';
+  },
+});
